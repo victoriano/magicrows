@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .placeholder {
+    @apply flex items-center justify-center p-8 bg-base-300 text-base-content bg-opacity-50 rounded-lg;
+  }
+} 

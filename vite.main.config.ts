@@ -7,6 +7,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    mainFields: ['module', 'jsnext:main', 'jsnext'],
   },
   build: {
     outDir: '.vite/main',
@@ -17,9 +18,19 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
+        'crypto',
+        'fs',
+        'fs/promises',
+        'path',
+        'os',
         'electron',
+        'electron-store',
+        /^node:/,
         ...Object.keys(require('./package.json').dependencies || {}),
       ],
+      output: {
+        format: 'cjs', // Use CommonJS format for main process
+      },
     },
     emptyOutDir: true,
     sourcemap: true,

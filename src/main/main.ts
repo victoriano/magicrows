@@ -1,8 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, session } from 'electron';
-import path from 'path';
-import fs from 'fs/promises';
-import { existsSync } from 'fs'; // Import the synchronous existsSync function
-import http from 'http';
+import * as path from 'path';
+import * as fs from 'fs';  // Use regular fs for existsSync
+import * as fsPromises from 'fs/promises';
+import * as http from 'http';
 import { initSecureStorage } from './secureStorage';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -49,17 +49,47 @@ const findAvailablePort = async (startPort: number, endPort: number): Promise<nu
 };
 
 const createWindow = async (): Promise<void> => {
+  // Determine the preload script path based on environment
+  let preloadPath: string;
+  
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (isDevelopment) {
+    // In development, use the preload script from the source directory
+    preloadPath = path.join(__dirname, '../preload/preload.js');
+  } else {
+    // In production, try multiple potential locations for the preload script
+    const potentialPaths = [
+      path.join(__dirname, 'preload.js'),                // Same directory
+      path.join(__dirname, '../preload/preload.js'),     // Up one level in preload dir
+      path.join(__dirname, '../../preload/preload.js'),  // Up two levels in preload dir
+      path.join(app.getAppPath(), '.vite/preload/preload.js') // In .vite directory
+    ];
+    
+    preloadPath = potentialPaths.find(p => fs.existsSync(p)) || potentialPaths[0];
+    
+    // Log the resolved preload path to help debug
+    console.log('Potential preload paths:', potentialPaths);
+    console.log('Selected preload path:', preloadPath);
+    console.log('Path exists:', fs.existsSync(preloadPath));
+    console.log('App path:', app.getAppPath());
+    console.log('Current directory:', __dirname);
+  }
+  
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 720,
     webPreferences: {
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
       webSecurity: false // Only for development! Remove in production
     },
   });
+
+  // Log the preload path to help debug
+  console.log('Preload script path:', preloadPath);
 
   // Set custom session permissions
   if (mainWindow) {
@@ -80,7 +110,7 @@ const createWindow = async (): Promise<void> => {
   }
 
   // In development mode, load from vite dev server
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     console.log('Running in development mode');
     mainWindow.webContents.openDevTools();
     
@@ -122,7 +152,7 @@ const createWindow = async (): Promise<void> => {
       console.log('App is packaged, looking for index at:', indexPath);
       
       // If the default path doesn't exist, try alternative locations
-      if (!existsSync(indexPath)) {
+      if (!fs.existsSync(indexPath)) {
         console.log(`Index not found at primary location: ${indexPath}`);
         
         // Define possible locations where the index.html might be in a packaged app
@@ -139,7 +169,7 @@ const createWindow = async (): Promise<void> => {
         // Find the first path that exists
         for (const testPath of possiblePaths) {
           console.log(`Trying path: ${testPath}`);
-          if (existsSync(testPath)) {
+          if (fs.existsSync(testPath)) {
             indexPath = testPath;
             console.log(`✅ Found index.html at: ${indexPath}`);
             break;
@@ -147,7 +177,7 @@ const createWindow = async (): Promise<void> => {
         }
         
         // If no path was found, log an error
-        if (!existsSync(indexPath)) {
+        if (!fs.existsSync(indexPath)) {
           console.error('❌ ERROR: Could not find index.html in any location!');
           // List all files in the app directory to help debug
           try {
@@ -177,8 +207,10 @@ const createWindow = async (): Promise<void> => {
     console.log(`Loading index from: ${indexPath}`);
     
     // Load the file or show an error page if it doesn't exist
-    if (existsSync(indexPath)) {
+    if (fs.existsSync(indexPath)) {
       mainWindow.loadFile(indexPath);
+      // Enable DevTools in production to help debug storage issues
+      mainWindow.webContents.openDevTools();
     } else {
       // Display an error page when index.html can't be found
       mainWindow.loadURL(`data:text/html;charset=utf-8,
@@ -218,7 +250,8 @@ ipcMain.handle('app:getInfo', () => {
     resourcesPath: process.resourcesPath,
     isPackaged: app.isPackaged,
     version: app.getVersion(),
-    platform: process.platform
+    platform: process.platform,
+    userDataPath: app.getPath('userData')
   };
 });
 
@@ -233,6 +266,16 @@ ipcMain.handle('dialog:openFile', async () => {
   return filePaths[0];
 });
 
+ipcMain.handle('dialog:selectDirectory', async () => {
+  if (!mainWindow) return null;
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select Output Directory'
+  });
+  if (canceled) return null;
+  return filePaths[0];
+});
+
 ipcMain.handle('dialog:saveFile', async () => {
   if (!mainWindow) return null;
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
@@ -242,13 +285,57 @@ ipcMain.handle('dialog:saveFile', async () => {
   return filePath;
 });
 
-ipcMain.handle('file:read', async (_, path) => {
-  const content = await fs.readFile(path, 'utf8');
-  return content;
+ipcMain.handle('file:read', async (_, filePath) => {
+  try {
+    // If this is an absolute path, use it directly
+    if (path.isAbsolute(filePath)) {
+      const content = await fsPromises.readFile(filePath, 'utf8');
+      return content;
+    }
+    
+    // Otherwise, read from the user data directory
+    const userDataPath = app.getPath('userData');
+    const fullPath = path.join(userDataPath, filePath);
+    console.log(`Reading file from: ${fullPath}`);
+    
+    try {
+      const content = await fsPromises.readFile(fullPath, 'utf8');
+      return content;
+    } catch (error) {
+      console.error(`Error reading file ${fullPath}:`, error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in file:read handler:', error);
+    throw error;
+  }
 });
 
-ipcMain.handle('file:write', async (_, path, content) => {
-  await fs.writeFile(path, content, 'utf8');
+ipcMain.handle('file:write', async (_, filePath, content) => {
+  try {
+    // If this is an absolute path, use it directly
+    if (path.isAbsolute(filePath)) {
+      await fsPromises.writeFile(filePath, content, 'utf8');
+      return;
+    }
+    
+    // Otherwise, write to the user data directory
+    const userDataPath = app.getPath('userData');
+    const fullPath = path.join(userDataPath, filePath);
+    console.log(`Writing file to: ${fullPath}`);
+    
+    // Ensure directory exists
+    const dir = path.dirname(fullPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    await fsPromises.writeFile(fullPath, content, 'utf8');
+    return;
+  } catch (error) {
+    console.error('Error in file:write handler:', error);
+    throw error;
+  }
 });
 
 // API key storage - in a real app, use a more secure method
@@ -263,24 +350,34 @@ ipcMain.handle('config:saveApiKeys', (_, keys) => {
   return;
 });
 
-// This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
-  createWindow();
-  
-  // Initialize secure storage
-  initSecureStorage();
+// Initialize the app and create window
+const initApp = async () => {
+  try {
+    // First initialize secure storage
+    await initSecureStorage();
+    console.log('Secure storage initialized successfully');
+    
+    // Then create the main window
+    await createWindow();
+  } catch (error) {
+    console.error('Failed to initialize application:', error);
+    app.quit();
+  }
+};
 
-  app.on('activate', () => {
-    // On macOS it's common to re-create a window when clicking on the dock icon
-    if (mainWindow === null) {
-      createWindow();
-    }
-  });
-});
+// This method will be called when Electron has finished initialization
+app.whenReady().then(initApp);
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-}); 
+});
+
+app.on('activate', () => {
+  // On macOS it's common to re-create a window when clicking on the dock icon
+  if (mainWindow === null) {
+    createWindow();
+  }
+});

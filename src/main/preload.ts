@@ -13,6 +13,7 @@ window.addEventListener('error', (event) => {
 contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: () => ipcRenderer.invoke('dialog:saveFile'),
+  selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   readFile: (path: string) => ipcRenderer.invoke('file:read', path),
   writeFile: (path: string, content: string) => ipcRenderer.invoke('file:write', path, content),
   getApiKeys: () => ipcRenderer.invoke('config:getApiKeys'),
@@ -30,26 +31,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 });
 
-// The type definition for the exposed API
+// TypeScript declarations for window.electronAPI
 declare global {
   interface Window {
     electronAPI: {
       openFile: () => Promise<string | null>;
       saveFile: () => Promise<string | null>;
+      selectDirectory: () => Promise<string | null>;
       readFile: (path: string) => Promise<string>;
       writeFile: (path: string, content: string) => Promise<boolean>;
       getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
       saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<boolean>;
       restart: () => Promise<void>;
       getAppInfo: () => Promise<{ version: string, platform: string }>;
-      
-      // Secure storage for API keys
       secureStorage: {
         getApiKey: (providerId: string) => Promise<string>;
         setApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
         deleteApiKey: (providerId: string) => Promise<boolean>;
         hasApiKey: (providerId: string) => Promise<boolean>;
       };
-    };
+    }
   }
 }

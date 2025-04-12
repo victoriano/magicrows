@@ -1,7 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { combineReducers } from 'redux';
-import { persistStore, persistReducer } from 'redux-persist';
-import storage from 'redux-persist/lib/storage';
+import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import electronStorage from './electronStorage';
 import configReducer from './slices/configSlice';
 import dataReducer from './slices/dataSlice';
 import processingReducer from './slices/processingSlice';
@@ -14,8 +14,9 @@ console.log('Setting up Redux store');
 // Configure persistence settings
 const persistConfig = {
   key: 'root',
-  storage,
-  whitelist: ['data', 'providers'] // Persist both data and providers
+  storage: electronStorage,
+  whitelist: ['data', 'providers'], // Persist both data and providers
+  debug: true, // Enable debug mode for Redux persist
 };
 
 const rootReducer = combineReducers({
@@ -33,12 +34,23 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE']
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER]
       }
     })
 });
 
-export const persistor = persistStore(store);
+// Log state changes for debugging
+store.subscribe(() => {
+  const state = store.getState();
+  console.log('Redux state updated:', {
+    providers: state.providers.providers.length
+  });
+});
+
+export const persistor = persistStore(store, null, () => {
+  console.log('Redux persist rehydration complete');
+  console.log('Current state after rehydration:', store.getState());
+});
 
 console.log('Redux store created successfully');
 

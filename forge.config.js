@@ -1,9 +1,27 @@
+const fs = require('fs');
+const path = require('path');
+
 module.exports = {
   packagerConfig: {
     asar: true,
     icon: './build/icon', // Path without extension for proper icon format selection
+    extraResource: [
+      // Add any additional resources here
+    ],
+    // Ensure native modules are properly built for the target platform
+    executableName: 'Rowvana',
+    // Add these options for native modules
+    ignore: [
+      "/node_modules/electron-store/node_modules/(?!.yarn-integrity)",
+      "/node_modules/(?!electron-store)/.*"
+    ]
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    // Force rebuilding native modules for the target platform
+    forceRebuild: true,
+    // Specify which native modules need to be rebuilt
+    onlyModules: ['electron-store']
+  },
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
@@ -51,10 +69,32 @@ module.exports = {
           },
         ],
       },
-    },
+    }
   ],
   electronRebuildConfig: {},
   hooks: {
+    packageAfterPrune: async (forgeConfig, buildPath) => {
+      console.log('Running packageAfterPrune hook to copy electron-store');
+      const sourceNodeModules = path.resolve(__dirname, 'node_modules');
+      const targetNodeModules = path.join(buildPath, 'node_modules');
+      
+      // Ensure the target directory exists
+      if (!fs.existsSync(targetNodeModules)) {
+        fs.mkdirSync(targetNodeModules, { recursive: true });
+      }
+      
+      // Copy electron-store and its dependencies
+      const electronStorePath = path.join(sourceNodeModules, 'electron-store');
+      const targetElectronStorePath = path.join(targetNodeModules, 'electron-store');
+      
+      // Skip if already exists
+      if (!fs.existsSync(targetElectronStorePath)) {
+        console.log('Copying electron-store module to package');
+        fs.cpSync(electronStorePath, targetElectronStorePath, { recursive: true });
+      }
+      
+      console.log('Finished copying modules');
+    },
     generateAssets: async () => {
       process.env.NODE_ENV = 'development';
     }

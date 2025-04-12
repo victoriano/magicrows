@@ -32,6 +32,7 @@ declare global {
     electronAPI: {
       openFile: () => Promise<string | null>;
       saveFile: () => Promise<string | null>;
+      selectDirectory: () => Promise<string | null>;
       readFile: (path: string) => Promise<string>;
       writeFile: (path: string, content: string) => Promise<boolean>;
       getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
@@ -55,6 +56,9 @@ const App: React.FC = () => {
   const [dropzoneActive, setDropzoneActive] = useState(false);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   
+  // Added state for output directory
+  const [outputDirectory, setOutputDirectory] = useState<string>('');
+  
   // Provider states
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
   const [showEditProviderModal, setShowEditProviderModal] = useState(false);
@@ -68,6 +72,17 @@ const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data);
   const providers = useSelector((state: RootState) => state.providers.providers);
+  
+  // Debug provider persistence on app init and when providers change
+  useEffect(() => {
+    console.log('PROVIDERS STATE:', providers);
+    console.log('Number of providers:', providers.length);
+    
+    // Log each provider individually
+    providers.forEach((provider, index) => {
+      console.log(`Provider ${index + 1}:`, provider);
+    });
+  }, [providers]);
   
   useEffect(() => {
     console.log('Recent files:', recentFiles);
@@ -292,6 +307,10 @@ const App: React.FC = () => {
       // Mock other methods as needed
       openFile: async () => null,
       saveFile: async () => null,
+      selectDirectory: async () => {
+        console.log('MOCK: Selecting directory');
+        return '/mock/output/directory';
+      },
       readFile: async () => '',
       writeFile: async () => true,
       getApiKeys: async () => ({}),
@@ -573,6 +592,21 @@ const App: React.FC = () => {
     setShowAddProviderModal(true);
   };
 
+  // Handle browsing for an output directory
+  const handleBrowseDirectory = async () => {
+    try {
+      const api = safelyAccessElectronAPI();
+      const selectedDirectory = await api.selectDirectory();
+      
+      if (selectedDirectory) {
+        console.log('Selected output directory:', selectedDirectory);
+        setOutputDirectory(selectedDirectory);
+      }
+    } catch (error) {
+      console.error('Error selecting output directory:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
@@ -581,7 +615,7 @@ const App: React.FC = () => {
             <img src="/rowvana_logo.png" alt="Rowvana Logo" className="h-8 mr-2" />
             <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
           </div>
-          <div className="flex space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
+          <div className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
             {['Import', 'Data', 'Settings'].map((tab) => (
               <button
                 key={tab}
@@ -879,9 +913,26 @@ const App: React.FC = () => {
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">Output Directory</label>
                       <div className="flex">
-                        <input type="text" className="px-3 py-2 border rounded-l-md flex-1" placeholder="Select output directory" />
-                        <button className="px-3 py-2 bg-base-300 border border-l-0 rounded-r-md">Browse</button>
+                        <input 
+                          type="text" 
+                          className="px-3 py-2 border rounded-l-md flex-1" 
+                          placeholder="Select output directory" 
+                          value={outputDirectory}
+                          onChange={(e) => setOutputDirectory(e.target.value)}
+                          readOnly
+                        />
+                        <button 
+                          className="px-3 py-2 bg-base-300 border border-l-0 rounded-r-md"
+                          onClick={handleBrowseDirectory}
+                        >
+                          Browse
+                        </button>
                       </div>
+                      {outputDirectory && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          Selected: {outputDirectory}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">Processing Threads</label>

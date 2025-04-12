@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiKeys: () => ipcRenderer.invoke('config:getApiKeys'),
   saveApiKeys: (keys: { openai?: string, perplexity?: string }) => 
     ipcRenderer.invoke('config:saveApiKeys', keys),
+  restart: () => ipcRenderer.invoke('app:restart'),
+  getAppInfo: () => ipcRenderer.invoke('app:getInfo'),
 });
 
 // The type definition for the exposed API
@@ -30,6 +32,14 @@ declare global {
       writeFile: (path: string, content: string) => Promise<void>;
       getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
       saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<void>;
+      restart: () => Promise<void>;
+      getAppInfo: () => Promise<{
+        appPath: string;
+        resourcesPath: string;
+        isPackaged: boolean;
+        version: string;
+        platform: string;
+      }>;
     }
   }
-} 
+}

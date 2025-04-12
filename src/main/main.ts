@@ -111,41 +111,90 @@ const createWindow = async (): Promise<void> => {
     // In production, load the index.html file from the correct location
     console.log('Running in production mode');
     
-    // We need to handle path resolution differently in a packaged app
+    // Get the correct path to the renderer index.html file
     let indexPath;
+    
     if (app.isPackaged) {
-      // When packaged, the rendered files are in the app.asar at a predictable location
-      indexPath = path.join(__dirname, '../renderer/index.html');
+      // In packaged app, the path is relative to the executable
+      // Use path.resolve with __dirname to get the absolute path
+      indexPath = path.resolve(__dirname, '../renderer/index.html');
+      console.log('App is packaged, looking for index at:', indexPath);
       
-      // If the above doesn't work, try these alternative paths
+      // If the default path doesn't exist, try alternative locations
       if (!existsSync(indexPath)) {
-        console.log(`Index not found at ${indexPath}, trying alternative paths...`);
+        console.log(`Index not found at primary location: ${indexPath}`);
+        
+        // Define possible locations where the index.html might be in a packaged app
         const possiblePaths = [
-          path.join(__dirname, '../../renderer/index.html'),
-          path.join(__dirname, '../index.html'),
-          path.join(process.resourcesPath, 'app.asar/renderer/index.html'),
-          path.join(process.resourcesPath, 'app.asar/.vite/build/index.html')
+          path.resolve(__dirname, '../renderer/index.html'),
+          path.resolve(__dirname, '../../renderer/index.html'),
+          path.resolve(__dirname, '../.vite/renderer/index.html'),
+          path.resolve(process.resourcesPath, 'app.asar/.vite/renderer/index.html'),
+          path.resolve(process.resourcesPath, 'app.asar/renderer/index.html'),
+          path.resolve(app.getAppPath(), 'renderer/index.html'),
+          path.resolve(app.getAppPath(), '.vite/renderer/index.html')
         ];
         
+        // Find the first path that exists
         for (const testPath of possiblePaths) {
+          console.log(`Trying path: ${testPath}`);
+          if (existsSync(testPath)) {
+            indexPath = testPath;
+            console.log(`✅ Found index.html at: ${indexPath}`);
+            break;
+          }
+        }
+        
+        // If no path was found, log an error
+        if (!existsSync(indexPath)) {
+          console.error('❌ ERROR: Could not find index.html in any location!');
+          // List all files in the app directory to help debug
           try {
-            if (existsSync(testPath)) {
-              indexPath = testPath;
-              console.log(`Found index at: ${indexPath}`);
-              break;
-            }
+            const appDir = app.getAppPath();
+            console.log(`Listing files in ${appDir}:`);
+            const { execSync } = require('child_process');
+            const result = execSync(`find "${appDir}" -name "*.html" -type f | sort`).toString();
+            console.log(result || 'No HTML files found');
           } catch (err) {
-            console.log(`Error checking path ${testPath}:`, err);
+            console.error('Failed to list app directory:', err);
           }
         }
       }
     } else {
       // For unpackaged production builds
-      indexPath = path.join(__dirname, '../renderer/index.html');
+      indexPath = path.resolve(__dirname, '../renderer/index.html');
+      console.log('App is not packaged, using index at:', indexPath);
+      
+      // For testing a "pseudo-packaged" environment, you can simulate production paths
+      if (process.env.SIMULATE_PRODUCTION === 'true') {
+        indexPath = path.resolve(__dirname, '../.vite/renderer/index.html');
+        console.log('Simulating production environment, using index at:', indexPath);
+      }
     }
     
+    // Log the final path being used
     console.log(`Loading index from: ${indexPath}`);
-    mainWindow.loadFile(indexPath);
+    
+    // Load the file or show an error page if it doesn't exist
+    if (existsSync(indexPath)) {
+      mainWindow.loadFile(indexPath);
+    } else {
+      // Display an error page when index.html can't be found
+      mainWindow.loadURL(`data:text/html;charset=utf-8,
+        <html>
+          <head><title>Error - File Not Found</title></head>
+          <body style="font-family: sans-serif; padding: 2rem;">
+            <h1 style="color: #e74c3c;">Error: Could not load application</h1>
+            <p>The application could not find the required files.</p>
+            <p>Looking for: <code>${indexPath}</code></p>
+            <p>This is usually caused by a packaging or build configuration issue.</p>
+            <hr>
+            <p><small>Application path: ${app.getAppPath()}</small></p>
+            <button onclick="window.electronAPI.restart()">Restart App</button>
+          </body>
+        </html>
+      `);
+    }
   }
 
   // Emitted when the window is closed.
@@ -154,6 +203,23 @@ const createWindow = async (): Promise<void> => {
     mainWindow = null;
   });
 };
+
+// Handle restart requests from the renderer
+ipcMain.handle('app:restart', () => {
+  app.relaunch();
+  app.exit(0);
+});
+
+// Provide application info for debugging purposes
+ipcMain.handle('app:getInfo', () => {
+  return {
+    appPath: app.getAppPath(),
+    resourcesPath: process.resourcesPath,
+    isPackaged: app.isPackaged,
+    version: app.getVersion(),
+    platform: process.platform
+  };
+});
 
 // Set up IPC handlers for file operations
 ipcMain.handle('dialog:openFile', async () => {

@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '.vite/build',
+    outDir: '.vite/main',
     lib: {
       entry: 'src/main/main.ts',
       formats: ['cjs'],
@@ -24,4 +24,4 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
   },
-}); 
+});

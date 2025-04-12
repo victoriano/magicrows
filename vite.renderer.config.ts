@@ -11,9 +11,19 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '.vite/build',
-    emptyOutDir: false,
+    // Change output directory to match where Electron expects files
+    outDir: path.join(__dirname, '.vite/renderer'),
+    emptyOutDir: true,
     sourcemap: true,
+    // Ensure the correct asset naming and paths for Electron
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        entryFileNames: 'index.js',
+        chunkFileNames: '[name].js',
+        assetFileNames: 'assets/[name][extname]'
+      }
+    }
   },
   server: {
     port: 5173,
@@ -26,7 +36,7 @@ export default defineConfig({
     },
     middlewareMode: false,
   },
-  // Public base path for assets
+  // Absolute base path for assets to ensure they're found in packaged app
   base: './',
   // Define global constants
   define: {
@@ -35,11 +45,6 @@ export default defineConfig({
   // Explicitly set entry point
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-redux', 'redux'],
-  },
-  experimental: {
-    renderBuiltUrl(filename) {
-      return filename;
-    },
   },
   // Set root directory properly
   root: path.join(__dirname, 'src/renderer'),

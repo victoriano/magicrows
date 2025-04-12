@@ -83,6 +83,39 @@ yarn build
 
 ### Creating Distributable Packages
 
+#### Testing Before Building (Recommended)
+
+Before creating a DMG or other distributable package, it's highly recommended to test the production build process:
+
+1. Use the included testing script:
+   ```bash
+   # Make the script executable (if needed)
+   chmod +x scripts/test-packaging.js
+   
+   # Run the test
+   node scripts/test-packaging.js
+   ```
+
+2. This script will:
+   - Build the application with production settings
+   - Verify the build outputs
+   - Test the path resolution logic
+   - Simulate how files are located in a packaged app
+   - Provide detailed logs of any issues found
+
+3. Watch the console output for any errors or warnings:
+   - Green checkmarks indicate successful steps
+   - Yellow warnings may need investigation
+   - Red errors must be fixed before packaging
+
+4. If the script fails or displays errors:
+   - Review the specific error messages
+   - Check the build output directories
+   - Make sure paths in the config match actual file locations
+   - Fix any issues before proceeding to create the DMG
+
+This testing process can save significant time by identifying packaging issues early, avoiding the need to rebuild DMGs repeatedly.
+
 #### macOS DMG Installer
 
 To create a DMG installer for macOS:
@@ -174,6 +207,54 @@ To create a Linux package:
 ```bash
 # Create a Debian package (on Linux)
 npm run make -- --platform=linux --targets=@electron-forge/maker-deb
+```
+
+## Troubleshooting
+
+### Packaging and Distribution Issues
+
+If you encounter issues when packaging the application or after installation:
+
+1. **File Not Found Errors**
+   - Check the main process logs for path resolution errors
+   - Make sure all build directories are being properly created
+   - Verify that `vite.renderer.config.ts`, `vite.main.config.ts`, and `vite.preload.config.ts` have correct `outDir` settings
+   - Update `package.json` main field if build paths have changed
+
+2. **Blank Screen After Launch**
+   - This often indicates the main window can't find `index.html`
+   - Run the test script to diagnose: `node scripts/test-packaging.js`
+   - Check the console output for file path errors
+   - Make sure the Electron main process can locate the renderer files
+
+3. **Missing Icons or Assets**
+   - Run `scripts/create-icons.js` to regenerate application icons
+   - Ensure assets are properly referenced with correct relative paths
+   - Use Vite's `?url` import syntax for images and other assets: `import logoImg from '../assets/logo.png?url'`
+
+4. **Electron-Squirrel-Startup Errors**
+   - This Windows-specific module is wrapped in a try-catch in the main process
+   - If errors persist, manually edit `src/main/main.ts` to remove or comment out the squirrel startup code
+
+### Development Environment Issues
+
+1. **Vite Build Failures**
+   - Make sure all Vite configuration files have correct paths and settings
+   - Check for conflicting `outDir` or `emptyOutDir` settings between configs
+   - Verify that all required dependencies are installed
+
+2. **Hot Reload Not Working**
+   - Check Vite server settings in the main process
+   - Verify that the HMR connection is being established
+   - Check port configuration (default is 5173)
+
+For more detailed diagnostics, run the app with additional logging:
+```bash
+# For main process logs
+ELECTRON_ENABLE_LOGGING=1 npm start
+
+# For packaging diagnostics
+node scripts/test-packaging.js
 ```
 
 ## API Keys

@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '.vite/build',
+    outDir: '.vite/preload',
     lib: {
       entry: 'src/main/preload.ts',
       formats: ['cjs'],
@@ -21,7 +21,7 @@ export default defineConfig({
         ...Object.keys(require('./package.json').dependencies || {}),
       ],
     },
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true,
   },
-}); 
+});

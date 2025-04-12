@@ -1,7 +1,7 @@
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store';
-import { setData, setLoading, removeRecentFile, clearData } from './store/slices/dataSlice';
+import { setData, setLoading, removeRecentFile, clearData, setRecentFiles } from './store/slices/dataSlice';
 import Papa from 'papaparse';
 
 const App: React.FC = () => {
@@ -9,6 +9,24 @@ const App: React.FC = () => {
   const dispatch = useDispatch();
   const { recentFiles, isLoading, csvData, error, currentFileName, currentFilePath } = useSelector((state: RootState) => state.data);
   
+  useEffect(() => {
+    console.log('Recent files:', recentFiles);
+  }, [recentFiles]);
+
+  const addTestFile = () => {
+    const testFile = {
+      id: `file_${Date.now()}`,
+      path: `/mock/path/test_file_${Date.now()}.csv`,
+      name: `test_file_${Date.now()}.csv`,
+      timestamp: Date.now()
+    };
+    
+    console.log('Adding test file to recent files:', testFile);
+    
+    // Use the proper Redux action to update recent files
+    dispatch(setRecentFiles([testFile, ...recentFiles]));
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useLayoutEffect(() => {
@@ -29,18 +47,68 @@ const App: React.FC = () => {
       
       if (!recentFile) {
         console.error('File not found in recent files');
+        dispatch(setLoading(false));
         return;
       }
       
       console.log(`Loading file from path: ${filePath}`);
       
+      // Try to get the saved data from localStorage
+      const savedFileData = localStorage.getItem(`csv_file_${filePath}`);
+      
+      if (savedFileData) {
+        try {
+          const fileData = JSON.parse(savedFileData);
+          dispatch(setData({
+            headers: fileData.headers,
+            rows: fileData.rows,
+            fileName: recentFile.name,
+            filePath: recentFile.path
+          }));
+          dispatch(setLoading(false));
+          return;
+        } catch (err) {
+          console.error('Error parsing saved file data:', err);
+        }
+      }
+      
+      // Fallback to mock data if saved data isn't available
       setTimeout(() => {
-        const headers = ['Column 1', 'Column 2', 'Column 3'];
-        const rows = [
-          ['Data 1', 'Data 2', 'Data 3'],
-          ['Data 4', 'Data 5', 'Data 6'],
-          ['Data 7', 'Data 8', 'Data 9'],
+        // Generate a dataset based on file name to appear unique
+        const fileNameHash = recentFile.name.split('').reduce((a, b) => {
+          a = ((a << 5) - a) + b.charCodeAt(0);
+          return a & a;
+        }, 0);
+        
+        // Generate headers and rows based on a hash of the filename
+        // This ensures the same file always gets the same mock data
+        const sectorIndex = Math.abs(fileNameHash) % 3;
+        
+        const sectors = [
+          '1. Agriculture',
+          '2. Forestry and logging',
+          '3. Manufacturing'
         ];
+        
+        const roles = [
+          '11. Chief executives, senior officials and legislators',
+          '12. Business managers',
+          '13. Production managers'
+        ];
+        
+        const sector = sectors[sectorIndex];
+        const role = roles[sectorIndex];
+        
+        // Create a larger dataset (20 rows instead of just 5)
+        const headers = ['nace', 'lace', 'source_api', 'automatable_task'];
+        const rows = Array(20).fill(0).map((_, i) => {
+          return [
+            sector,
+            role, 
+            'openai',
+            `Task ${i+1} for ${recentFile.name}: ${sector} automation technique ${i+1}`
+          ];
+        });
         
         dispatch(setData({
           headers,
@@ -48,13 +116,10 @@ const App: React.FC = () => {
           fileName: recentFile.name,
           filePath: recentFile.path
         }));
-        
         dispatch(setLoading(false));
-        
-        setActiveTab('data');
       }, 500);
-    } catch (error) {
-      console.error('Error loading file:', error);
+    } catch (err) {
+      console.error('Error in handleReloadFile:', err);
       dispatch(setLoading(false));
     }
   };
@@ -94,16 +159,30 @@ const App: React.FC = () => {
     if (selectedFile) {
       dispatch(setLoading(true));
       try {
+        // For testing, add a mock file path if it doesn't exist
+        const filePath = selectedFile.path || `/mock/path/${selectedFile.name}`;
+        
         Papa.parse(selectedFile, {
           complete: (results) => {
             const headers = results.data[0] as string[];
             const rows = results.data.slice(1) as string[][];
             
+            console.log('Adding file to recent files:', selectedFile.name, filePath);
+            
+            // We will store the full dataset in localStorage for later retrieval
+            const fileData = {
+              headers,
+              rows
+            };
+            
+            // Store the file data in localStorage with the file path as the key
+            localStorage.setItem(`csv_file_${filePath}`, JSON.stringify(fileData));
+            
             dispatch(setData({
               headers,
               rows,
               fileName: selectedFile.name,
-              filePath: selectedFile.path
+              filePath: filePath
             }));
             dispatch(setLoading(false));
           },
@@ -227,14 +306,29 @@ const App: React.FC = () => {
                             <div className="text-sm font-medium text-gray-700 truncate">{file.name}</div>
                             <div className="text-xs text-gray-500">{formatTimestamp(file.timestamp)}</div>
                           </div>
-                          <button 
-                            className="ml-2 text-gray-400 hover:text-gray-600"
-                            onClick={(e) => handleRemoveFromRecent(e, file.id)}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                          <div className="flex space-x-1">
+                            <button 
+                              className="p-1 text-primary hover:text-primary-focus"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering the parent onClick
+                                handleReloadFile(file.path);
+                              }}
+                              title="Reimport file"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                            <button 
+                              className="p-1 text-gray-400 hover:text-gray-600"
+                              onClick={(e) => handleRemoveFromRecent(e, file.id)}
+                              title="Remove from history"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -242,10 +336,17 @@ const App: React.FC = () => {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[200px] text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 011-2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     <p className="text-sm text-gray-500">No recent files</p>
                     <p className="text-xs text-gray-400 mt-1">Upload a file to get started</p>
+                    <p className="text-xs text-gray-500 mt-2">Debug: {recentFiles.length} files in state</p>
+                    <button 
+                      className="mt-3 px-3 py-1 text-xs bg-base-300 rounded-md"
+                      onClick={addTestFile}
+                    >
+                      Add Test File (Debug)
+                    </button>
                   </div>
                 )}
               </div>

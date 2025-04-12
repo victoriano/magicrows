@@ -14,8 +14,9 @@ import {
 import { RootState, AppDispatch } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import Papa from 'papaparse';
-// Use absolute path from the file system for the logo in Electron
-const logoImgPath = new URL('../assets/rowvana_logo.png', import.meta.url).href;
+
+// Import the logo image directly - this ensures Vite will process it correctly
+import rowvanaLogo from '../assets/rowvana_logo.png';
 
 // Define the provider type
 interface Provider {
@@ -612,7 +613,7 @@ const App: React.FC = () => {
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <img src="/rowvana_logo.png" alt="Rowvana Logo" className="h-8 mr-2" />
+            <img src={rowvanaLogo} alt="Rowvana Logo" className="h-8 mr-2" />
             <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
           </div>
           <div className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">

@@ -1,13 +1,36 @@
 import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store';
-import { setData, setLoading, removeRecentFile, clearData, setRecentFiles } from './store/slices/dataSlice';
+import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import Papa from 'papaparse';
-// Fix the logo import to use a relative path that will work in production
-import logoImgPath from '../assets/rowvana_logo.png?url';
+// Use absolute path from the file system for the logo in Electron
+const logoImgPath = new URL('../assets/rowvana_logo.png', import.meta.url).href;
+
+// Define the provider type
+interface Provider {
+  id: string;
+  name: string;
+  type: string;
+  isActive: boolean;
+  apiKey: string;
+}
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('import');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [columnToProcess, setColumnToProcess] = useState('');
+  const [dropzoneActive, setDropzoneActive] = useState(false);
+  const [showDropdown, setShowDropdown] = useState<string | null>(null);
+  
+  // Provider integration states
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [showEditProviderModal, setShowEditProviderModal] = useState(false);
+  const [newProviderType, setNewProviderType] = useState('openai');
+  const [newProviderName, setNewProviderName] = useState('');
+  const [newProviderApiKey, setNewProviderApiKey] = useState('');
+  const [editingProvider, setEditingProvider] = useState<string | null>(null);
+  const [editProviderApiKey, setEditProviderApiKey] = useState('');
   const dispatch = useDispatch();
   const { recentFiles, isLoading, csvData, error, currentFileName, currentFilePath } = useSelector((state: RootState) => state.data);
   
@@ -43,6 +66,9 @@ const App: React.FC = () => {
 
   const handleReloadFile = (filePath: string) => {
     dispatch(setLoading(true));
+    
+    // Update the timestamp whenever a file is accessed
+    dispatch(updateFileTimestamp(filePath));
     
     try {
       const recentFile = recentFiles.find(file => file.path === filePath);
@@ -198,16 +224,188 @@ const App: React.FC = () => {
     }
   };
 
+  // Handle toggling the dropdown menu
+  const toggleDropdown = (provider: string) => {
+    if (showDropdown === provider) {
+      setShowDropdown(null);
+    } else {
+      setShowDropdown(provider);
+    }
+  };
+
+  // Handle removing a provider integration
+  const handleRemoveProvider = (providerId: string) => {
+    // In a real implementation, this would remove the API key from storage
+    console.log(`Removing ${providerId} integration`);
+    setProviders(providers.filter(provider => provider.id !== providerId));
+    setShowDropdown(null);
+  };
+
+  // Handle editing a provider
+  const handleEditProvider = (providerId: string) => {
+    const provider = providers.find(p => p.id === providerId);
+    if (provider) {
+      setEditingProvider(providerId);
+      setEditProviderApiKey(provider.apiKey);
+      setShowEditProviderModal(true);
+    }
+    setShowDropdown(null);
+  };
+
+  // Handle saving an edited provider
+  const handleSaveEditedProvider = () => {
+    if (editingProvider) {
+      const newProviders = [...providers];
+      const index = newProviders.findIndex(p => p.id === editingProvider);
+      if (index !== -1) {
+        newProviders[index].apiKey = editProviderApiKey;
+        newProviders[index].isActive = !!editProviderApiKey;
+        setProviders(newProviders);
+      }
+      
+      // Close the modal
+      setShowEditProviderModal(false);
+      setEditingProvider(null);
+      setEditProviderApiKey('');
+    }
+  };
+
+  // Handle closing the edit provider modal
+  const handleCloseEditModal = () => {
+    setShowEditProviderModal(false);
+    setEditingProvider(null);
+    setEditProviderApiKey('');
+  };
+
+  // Handle adding a new provider
+  const handleAddProviderClick = () => {
+    // Generate default name based on provider type with sequential numbering
+    const baseProviderName = `my${newProviderType.charAt(0).toUpperCase() + newProviderType.slice(1)}`;
+    
+    // Check if providers with the same base name already exist
+    const existingProviders = providers.filter(p => 
+      p.name.startsWith(baseProviderName)
+    );
+    
+    if (existingProviders.length === 0) {
+      // No providers with this name exist, use the base name
+      setNewProviderName(baseProviderName);
+    } else {
+      // Find the highest number suffix
+      let highestNum = 1;
+      existingProviders.forEach(p => {
+        // Extract number from the end of the name if it exists
+        const match = p.name.match(new RegExp(`${baseProviderName}(\\d+)$`));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num >= highestNum) {
+            highestNum = num + 1;
+          }
+        } else if (p.name === baseProviderName) {
+          // If exact match without number exists, start at 2
+          highestNum = Math.max(2, highestNum);
+        }
+      });
+      
+      // Set name with the next sequential number
+      setNewProviderName(`${baseProviderName}${highestNum}`);
+    }
+    
+    setShowAddProviderModal(true);
+  };
+
+  // Handle provider type change in the modal
+  const handleProviderTypeChange = (type: string) => {
+    setNewProviderType(type);
+    
+    // Update the name when provider type changes
+    const baseProviderName = `my${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    
+    // Check if providers with the same base name already exist
+    const existingProviders = providers.filter(p => 
+      p.name.startsWith(baseProviderName)
+    );
+    
+    if (existingProviders.length === 0) {
+      // No providers with this name exist, use the base name
+      setNewProviderName(baseProviderName);
+    } else {
+      // Find the highest number suffix
+      let highestNum = 1;
+      existingProviders.forEach(p => {
+        // Extract number from the end of the name if it exists
+        const match = p.name.match(new RegExp(`${baseProviderName}(\\d+)$`));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num >= highestNum) {
+            highestNum = num + 1;
+          }
+        } else if (p.name === baseProviderName) {
+          // If exact match without number exists, start at 2
+          highestNum = Math.max(2, highestNum);
+        }
+      });
+      
+      // Set name with the next sequential number
+      setNewProviderName(`${baseProviderName}${highestNum}`);
+    }
+  };
+
+  // Handle saving an API key
+  const handleSaveApiKey = (providerId: string) => {
+    // Update the provider's active status
+    const newProviders = [...providers];
+    const index = newProviders.findIndex(p => p.id === providerId);
+    if (index !== -1 && newProviders[index].apiKey) {
+      newProviders[index].isActive = true;
+      setProviders(newProviders);
+      setEditingProvider(null);
+    }
+  };
+
+  // Handle closing the add provider modal
+  const handleCloseModal = () => {
+    setNewProviderName('');
+    setNewProviderApiKey('');
+    setShowAddProviderModal(false);
+  };
+
+  // Handle adding a new provider
+  const handleAddProvider = () => {
+    if (newProviderName.trim() && newProviderApiKey.trim()) {
+      // Create a unique ID for the provider
+      const timestamp = Date.now();
+      const newProviderId = `${newProviderType}_${timestamp}`;
+      
+      // Add the new provider
+      setProviders([
+        ...providers,
+        { 
+          id: newProviderId, 
+          name: newProviderName.trim(), 
+          type: newProviderType, 
+          isActive: true, 
+          apiKey: newProviderApiKey 
+        }
+      ]);
+      
+      // Reset the form
+      setNewProviderName('');
+      setNewProviderApiKey('');
+      setShowAddProviderModal(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <img src={logoImgPath} alt="Rowvana Logo" className="h-8 mr-2" />
+            <img src="/rowvana_logo.png" alt="Rowvana Logo" className="h-8 mr-2" />
             <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
           </div>
           <div className="flex space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
-            {['Import', 'Data', 'Process', 'Results', 'Settings'].map((tab) => (
+            {['Import', 'Data', 'Settings'].map((tab) => (
               <button
                 key={tab}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -330,7 +528,7 @@ const App: React.FC = () => {
                               title="Remove from history"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             </button>
                           </div>
@@ -341,7 +539,7 @@ const App: React.FC = () => {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[200px] text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 011-2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     <p className="text-sm text-gray-500">No recent files</p>
                     <p className="text-xs text-gray-400 mt-1">Upload a file to get started</p>
@@ -371,7 +569,7 @@ const App: React.FC = () => {
                       Import
                     </button>
                     <button 
-                      className="px-3 py-1 text-sm bg-error text-white rounded-md shadow-sm"
+                      className="px-3 py-1 text-sm bg-base-200 rounded-md"
                       onClick={handleClearFile}
                     >
                       Clear
@@ -426,19 +624,79 @@ const App: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-base-200 rounded-lg p-6">
-                  <h3 className="font-medium mb-3">Application Settings</h3>
+                  <h3 className="font-medium mb-3">Providers</h3>
                   <div className="space-y-4">
-                    <div className="flex flex-col space-y-1">
-                      <label className="text-sm font-medium">API Key</label>
-                      <input type="password" className="px-3 py-2 border rounded-md" placeholder="Enter your API key" />
+                    <div className="flex flex-col space-y-3">
+                      {providers.length > 0 ? (
+                        providers.map(provider => (
+                          <div key={provider.id} className="bg-base-100 p-3 rounded-md border border-gray-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-sm">{provider.name}</span>
+                                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
+                                  {provider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
+                                </span>
+                                <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                  provider.isActive 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {provider.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <div className="relative">
+                                <button 
+                                  className="p-1 rounded-md hover:bg-base-200"
+                                  onClick={() => toggleDropdown(provider.id)}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                                </button>
+                                {showDropdown === provider.id && (
+                                  <div className="absolute right-0 mt-1 w-36 bg-white border rounded-md shadow-md z-10">
+                                    <button 
+                                      className="w-full px-4 py-2 text-sm text-left text-blue-600 hover:bg-gray-100"
+                                      onClick={() => handleEditProvider(provider.id)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button 
+                                      className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-gray-100"
+                                      onClick={() => handleRemoveProvider(provider.id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col space-y-2">
+                              <p className="text-xs text-gray-500">
+                                {provider.isActive ? 
+                                  'API key is set and the integration is active.' : 
+                                  'No API key set. Click Edit to add your key.'}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="bg-base-100 p-6 rounded-md border border-gray-200 flex flex-col items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 mb-3">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                          </svg>
+                          <p className="text-sm text-gray-500 mb-1">No API integrations configured</p>
+                          <p className="text-xs text-gray-400 text-center mb-4">Add an integration to connect with AI providers</p>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-col space-y-1">
-                      <label className="text-sm font-medium">Output Directory</label>
-                      <input type="text" className="px-3 py-2 border rounded-md" placeholder="Select output directory" />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" className="checkbox" />
-                      <span className="text-sm">Save results automatically</span>
+                    
+                    <div className="pt-2">
+                      <button className="w-full px-4 py-2 text-sm bg-primary text-white hover:bg-primary-focus rounded-md flex items-center justify-center"
+                        onClick={handleAddProviderClick}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Add New Provider
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -446,16 +704,19 @@ const App: React.FC = () => {
                   <h3 className="font-medium mb-3">Advanced Settings</h3>
                   <div className="space-y-4">
                     <div className="flex flex-col space-y-1">
-                      <label className="text-sm font-medium">Model</label>
-                      <select className="px-3 py-2 border rounded-md">
-                        <option>Default</option>
-                        <option>Fast</option>
-                        <option>Precise</option>
-                      </select>
+                      <label className="text-sm font-medium">Output Directory</label>
+                      <div className="flex">
+                        <input type="text" className="px-3 py-2 border rounded-l-md flex-1" placeholder="Select output directory" />
+                        <button className="px-3 py-2 bg-base-300 border border-l-0 rounded-r-md">Browse</button>
+                      </div>
                     </div>
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">Processing Threads</label>
                       <input type="number" className="px-3 py-2 border rounded-md" defaultValue={4} />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" className="checkbox" />
+                      <span className="text-sm">Save results automatically</span>
                     </div>
                   </div>
                 </div>
@@ -510,7 +771,7 @@ const App: React.FC = () => {
               <div className="bg-white rounded-xl shadow-card p-6 text-center">
                 <div className="py-8">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <h3 className="text-lg font-medium text-gray-800 mb-2">No Data Imported</h3>
                   <p className="text-gray-500 max-w-md mx-auto mb-6">
@@ -527,88 +788,109 @@ const App: React.FC = () => {
             )}
           </div>
         )}
-
-        {activeTab === 'process' && (
-          <div className="col-span-1 md:col-span-2 lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Processing</h2>
-                  <p className="text-sm text-gray-600">Generate tasks using AI APIs</p>
-                </div>
-                <button className="px-4 py-1.5 text-sm bg-primary text-white rounded-md">Start Processing</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-base-200 rounded-lg p-6">
-                  <h3 className="font-medium mb-3">Processing Options</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" className="checkbox" checked />
-                      <span className="text-sm">Option 1</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input type="checkbox" className="checkbox" />
-                      <span className="text-sm">Option 2</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-base-200 rounded-lg p-6 flex items-center justify-center">
-                  <div className="text-center text-gray-500">Processing Panel (Coming Soon)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'results' && (
-          <div className="col-span-1 md:col-span-2 lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Results</h2>
-                  <p className="text-sm text-gray-600">View and export generated tasks</p>
-                </div>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Filter</button>
-                  <button className="px-3 py-1 text-sm bg-primary text-white rounded-md">Export</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                  <div className="bg-base-200 rounded-lg p-6 h-[300px] flex items-center justify-center">
-                    <div className="text-center text-gray-500">Results Chart (Coming Soon)</div>
-                  </div>
-                </div>
-                <div className="md:col-span-1">
-                  <div className="bg-base-200 rounded-lg p-6 h-[300px] flex flex-col">
-                    <h3 className="font-medium mb-3">Statistics</h3>
-                    <div className="space-y-3 flex-1">
-                      <div className="flex justify-between items-center p-2 bg-base-100 rounded">
-                        <span className="text-sm">Total Items</span>
-                        <span className="font-semibold">120</span>
-                      </div>
-                      <div className="flex justify-between items-center p-2 bg-base-100 rounded">
-                        <span className="text-sm">Processed</span>
-                        <span className="font-semibold">78</span>
-                      </div>
-                      <div className="flex justify-between items-center p-2 bg-base-100 rounded">
-                        <span className="text-sm">Success Rate</span>
-                        <span className="font-semibold">92%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       <footer className="py-4 border-t bg-white mt-auto">
         <div className="container mx-auto px-6 text-center text-sm text-gray-500">
-          <p>Rowvana - v0.1.0</p>
+          <p>Rowvana &copy; {new Date().getFullYear()} | Version 0.1.0</p>
         </div>
       </footer>
+
+      {/* Add Provider Modal */}
+      {showAddProviderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add New Provider</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-1">
+                <label className="text-sm font-medium">Provider Type</label>
+                <select 
+                  className="px-3 py-2 border rounded-md"
+                  value={newProviderType}
+                  onChange={(e) => handleProviderTypeChange(e.target.value)}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="perplexity">Perplexity</option>
+                </select>
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-sm font-medium">Provider Name</label>
+                <input
+                  type="text"
+                  className="px-3 py-2 border rounded-md"
+                  placeholder="e.g., My OpenAI"
+                  value={newProviderName}
+                  onChange={(e) => setNewProviderName(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-sm font-medium">API Key</label>
+                <input
+                  type="text"
+                  className="px-3 py-2 border rounded-md font-mono"
+                  placeholder="Enter API key"
+                  onFocus={(e) => e.target.type = 'text'}
+                  onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
+                  value={newProviderApiKey}
+                  onChange={(e) => setNewProviderApiKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button
+                className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50"
+                onClick={handleCloseModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-primary text-white rounded-md"
+                onClick={handleAddProvider}
+                disabled={!newProviderName.trim()}
+              >
+                Add Provider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Provider Modal */}
+      {showEditProviderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Edit Provider</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-1">
+                <label className="text-sm font-medium">API Key</label>
+                <input
+                  type="text"
+                  className="px-3 py-2 border rounded-md font-mono"
+                  placeholder="Enter API key"
+                  onFocus={(e) => e.target.type = 'text'}
+                  onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
+                  value={editProviderApiKey}
+                  onChange={(e) => setEditProviderApiKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <button
+                className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50"
+                onClick={handleCloseEditModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-sm bg-primary text-white rounded-md"
+                onClick={handleSaveEditedProvider}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

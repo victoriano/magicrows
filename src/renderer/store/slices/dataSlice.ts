@@ -98,6 +98,23 @@ export const dataSlice = createSlice({
     setRecentFiles: (state, action: PayloadAction<RecentFile[]>) => {
       state.recentFiles = action.payload;
     },
+    updateFileTimestamp: (state, action: PayloadAction<string>) => {
+      // Find the file with the matching path
+      const fileIndex = state.recentFiles.findIndex(file => file.path === action.payload);
+      if (fileIndex !== -1) {
+        // Create a copy of the file with updated timestamp
+        const updatedFile = {
+          ...state.recentFiles[fileIndex],
+          timestamp: Date.now()
+        };
+        
+        // Remove the file from the current position
+        state.recentFiles.splice(fileIndex, 1);
+        
+        // Add it back at the top of the list
+        state.recentFiles.unshift(updatedFile);
+      }
+    },
   },
 });
 
@@ -107,7 +124,8 @@ export const {
   setLoading, 
   setError,
   removeRecentFile,
-  setRecentFiles
+  setRecentFiles,
+  updateFileTimestamp
 } = dataSlice.actions;
 
 export default dataSlice.reducer;

@@ -2,7 +2,17 @@
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        'xl': '1rem',
+      },
+      boxShadow: {
+        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+      },
+    },
   },
   plugins: [require('daisyui')],
   daisyui: {
@@ -10,6 +20,37 @@ module.exports = {
       'light', 
       'dark',
       {
+        modern: {
+          "color-scheme": "light",
+          "color-base-100": "hsl(0, 0%, 100%)",
+          "color-base-200": "hsl(220, 20%, 97%)",
+          "color-base-300": "hsl(220, 15%, 94%)",
+          "color-base-content": "hsl(220, 20%, 25%)",
+          "color-primary": "hsl(210, 100%, 50%)",
+          "color-primary-content": "hsl(0, 0%, 100%)",
+          "color-secondary": "hsl(210, 30%, 30%)",
+          "color-secondary-content": "hsl(0, 0%, 100%)",
+          "color-accent": "hsl(150, 60%, 50%)",
+          "color-accent-content": "hsl(150, 100%, 15%)",
+          "color-neutral": "hsl(220, 10%, 30%)",
+          "color-neutral-content": "hsl(220, 10%, 95%)",
+          "color-info": "hsl(210, 80%, 60%)",
+          "color-info-content": "hsl(210, 80%, 15%)",
+          "color-success": "hsl(150, 70%, 45%)",
+          "color-success-content": "hsl(150, 70%, 15%)",
+          "color-warning": "hsl(40, 90%, 60%)",
+          "color-warning-content": "hsl(40, 90%, 15%)",
+          "color-error": "hsl(0, 80%, 60%)",
+          "color-error-content": "hsl(0, 80%, 15%)",
+          "--radius-selector": "0.5rem",
+          "--radius-field": "0.375rem",
+          "--radius-box": "0.75rem",
+          "--size-selector": "0.2rem",
+          "--size-field": "0.2rem",
+          "--border": "1px",
+          "--depth": "1",
+          "--noise": "0"
+        },
         silk: {
           "color-scheme": "light",
           "color-base-100": "oklch(97% 0.0035 67.78)",
@@ -44,4 +85,4 @@ module.exports = {
       }
     ],
   },
-}; 
+};

@@ -4,6 +4,9 @@ import dataReducer from './slices/dataSlice';
 import processingReducer from './slices/processingSlice';
 import resultsReducer from './slices/resultsSlice';
 
+// For debugging
+console.log('Setting up Redux store');
+
 export const store = configureStore({
   reducer: {
     config: configReducer,
@@ -12,6 +15,8 @@ export const store = configureStore({
     results: resultsReducer,
   },
 });
+
+console.log('Redux store created successfully');
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>;

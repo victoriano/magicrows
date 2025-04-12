@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import CsvUpload from './components/CsvUpload';
 // As we develop the application, these will be imported from the actual components
 // import ConfigPanel from './components/ConfigPanel';
 // import DataPreview from './components/DataPreview';
@@ -9,11 +10,23 @@ import { useDispatch, useSelector } from 'react-redux';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('config');
   
+  // Set the theme to 'silk' when the component mounts (before render)
+  useLayoutEffect(() => {
+    // Apply the theme after a short delay to ensure the DOM is ready
+    const timer = setTimeout(() => {
+      const htmlElement = document.documentElement;
+      htmlElement.setAttribute('data-theme', 'silk');
+      console.log('Theme set to silk');
+    }, 0);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="navbar bg-base-200 shadow-md">
         <div className="flex-1">
-          <h1 className="text-xl font-bold px-4">NACE/ISCO Task Generator</h1>
+          <h1 className="text-xl font-bold px-4">Rowvana</h1>
         </div>
         <div className="flex-none px-4">
           <div className="tabs tabs-boxed">
@@ -47,13 +60,16 @@ const App: React.FC = () => {
 
       <main className="container mx-auto p-4">
         {activeTab === 'config' && (
-          <div className="card bg-base-200 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">Configuration</h2>
-              <p>Configure input/output files and API settings.</p>
-              {/* <ConfigPanel /> */}
-              <div className="placeholder">Configuration Panel Component (Coming Soon)</div>
+          <div>
+            <div className="card bg-base-200 shadow-xl mb-4">
+              <div className="card-body">
+                <h2 className="card-title">Configuration</h2>
+                <p>Configure input/output files and API settings.</p>
+                {/* <ConfigPanel /> */}
+                <div className="placeholder mb-4">Configuration Panel Component (Coming Soon)</div>
+              </div>
             </div>
+            <CsvUpload />
           </div>
         )}
 
@@ -93,7 +109,7 @@ const App: React.FC = () => {
 
       <footer className="footer footer-center p-4 bg-base-200 text-base-content">
         <div>
-          <p>NACE/ISCO Task Generator - v0.1.0</p>
+          <p>Rowvana - v0.1.0</p>
         </div>
       </footer>
     </div>

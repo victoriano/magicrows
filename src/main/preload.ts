@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Suppress dragEvent not defined errors - this is an Electron quirk
+window.addEventListener('error', (event) => {
+  if (event.error && event.error.toString().includes('dragEvent is not defined')) {
+    event.preventDefault();
+    console.log('Suppressed dragEvent error (known Electron issue)');
+  }
+});
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {

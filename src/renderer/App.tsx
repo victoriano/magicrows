@@ -1,18 +1,17 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import CsvUpload from './components/CsvUpload';
-// As we develop the application, these will be imported from the actual components
-// import ConfigPanel from './components/ConfigPanel';
-// import DataPreview from './components/DataPreview';
-// import ProcessingPanel from './components/ProcessingPanel';
-// import ResultsView from './components/ResultsView';
+import { RootState } from './store';
+import { setData, setLoading, removeRecentFile, clearData } from './store/slices/dataSlice';
+import Papa from 'papaparse';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('config');
+  const dispatch = useDispatch();
+  const { recentFiles, isLoading, csvData, error, currentFileName, currentFilePath } = useSelector((state: RootState) => state.data);
   
-  // Set the theme to 'modern' when the component mounts (before render)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useLayoutEffect(() => {
-    // Apply the theme after a short delay to ensure the DOM is ready
     const timer = setTimeout(() => {
       const htmlElement = document.documentElement;
       htmlElement.setAttribute('data-theme', 'modern');
@@ -22,13 +21,109 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleReloadFile = (filePath: string) => {
+    dispatch(setLoading(true));
+    
+    try {
+      const recentFile = recentFiles.find(file => file.path === filePath);
+      
+      if (!recentFile) {
+        console.error('File not found in recent files');
+        return;
+      }
+      
+      console.log(`Loading file from path: ${filePath}`);
+      
+      setTimeout(() => {
+        const headers = ['Column 1', 'Column 2', 'Column 3'];
+        const rows = [
+          ['Data 1', 'Data 2', 'Data 3'],
+          ['Data 4', 'Data 5', 'Data 6'],
+          ['Data 7', 'Data 8', 'Data 9'],
+        ];
+        
+        dispatch(setData({
+          headers,
+          rows,
+          fileName: recentFile.name,
+          filePath: recentFile.path
+        }));
+        
+        dispatch(setLoading(false));
+        
+        setActiveTab('data');
+      }, 500);
+    } catch (error) {
+      console.error('Error loading file:', error);
+      dispatch(setLoading(false));
+    }
+  };
+
+  const handleRemoveFromRecent = (e: React.MouseEvent, fileId: string) => {
+    e.stopPropagation();
+    dispatch(removeRecentFile(fileId));
+  };
+
+  const formatTimestamp = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return `Today at ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `Yesterday at ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    } else {
+      return `${date.toLocaleDateString()} at ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }
+  };
+
+  const handleImportFile = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleClearFile = () => {
+    dispatch(clearData());
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    if (selectedFile) {
+      dispatch(setLoading(true));
+      try {
+        Papa.parse(selectedFile, {
+          complete: (results) => {
+            const headers = results.data[0] as string[];
+            const rows = results.data.slice(1) as string[][];
+            
+            dispatch(setData({
+              headers,
+              rows,
+              fileName: selectedFile.name,
+              filePath: selectedFile.path
+            }));
+            dispatch(setLoading(false));
+          },
+          error: (error) => {
+            dispatch(setLoading(false));
+          }
+        });
+      } catch (err) {
+        dispatch(setLoading(false));
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
           <div className="flex space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
-            {['Config', 'Data', 'Process', 'Results'].map((tab) => (
+            {['Config', 'Data', 'Process', 'Results', 'Settings'].map((tab) => (
               <button
                 key={tab}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -45,54 +140,225 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="container mx-auto py-6 px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
         {activeTab === 'config' && (
           <>
-            <div className="col-span-1 md:col-span-2 lg:col-span-3">
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">Configuration</h2>
-                    <p className="text-sm text-gray-600">Configure input/output files and settings</p>
-                  </div>
-                </div>
-                <div className="bg-base-200 rounded-lg p-4 my-4">
-                  <div className="text-center text-gray-500 py-4">Configuration Panel (Coming Soon)</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="col-span-1 md:col-span-2 lg:col-span-2">
-              <div className="bg-white rounded-xl shadow-card p-6 h-full">
+            <div className="grid grid-cols-3 gap-6">
+              {/* Data Upload Section */}
+              <div className="col-span-2 bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800">Data Upload</h2>
                     <p className="text-sm text-gray-600">Upload your CSV files</p>
                   </div>
                 </div>
-                <CsvUpload />
+                <div className="upload-container">
+                  {currentFileName && csvData ? (
+                    <div className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center bg-base-200">
+                      <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div className="px-3 py-1 bg-base-100 rounded-md text-sm font-medium mb-2">
+                        {currentFileName}
+                      </div>
+                      <button 
+                        className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                        onClick={handleClearFile}
+                      >
+                        Remove file
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center cursor-pointer bg-base-200 transition-all hover:bg-base-200/70"
+                      onClick={handleImportFile}
+                    >
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept=".csv" 
+                        onChange={handleFileChange} 
+                      />
+                      <div className="flex flex-col items-center">
+                        <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        </div>
+                        <p className="text-sm font-medium text-gray-600">Drag and drop your CSV file here</p>
+                        <p className="text-xs text-gray-500 mt-1">or click to browse files</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="col-span-1 md:col-span-2 lg:col-span-1">
-              <div className="bg-white rounded-xl shadow-card p-6 h-full">
+              
+              {/* Recent Activity Section */}
+              <div className="col-span-1 bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
-                    <p className="text-sm text-gray-600">Latest uploads and processes</p>
+                    <p className="text-sm text-gray-600">Previously loaded files</p>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  {[1, 2, 3].map((item) => (
-                    <div key={item} className="flex items-center p-3 bg-base-200 rounded-lg">
-                      <div className="w-2 h-2 bg-success rounded-full mr-3"></div>
-                      <div className="text-sm">Sample Activity {item}</div>
+                
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-[200px]">
+                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : recentFiles.length > 0 ? (
+                  <div className="h-[200px] overflow-y-auto">
+                    <div className="space-y-3">
+                      {recentFiles.map((file) => (
+                        <div 
+                          key={file.id} 
+                          className="flex items-center p-3 bg-base-200 rounded-lg cursor-pointer hover:bg-base-200/80 transition-colors"
+                          onClick={() => handleReloadFile(file.path)}
+                        >
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-700 truncate">{file.name}</div>
+                            <div className="text-xs text-gray-500">{formatTimestamp(file.timestamp)}</div>
+                          </div>
+                          <button 
+                            className="ml-2 text-gray-400 hover:text-gray-600"
+                            onClick={(e) => handleRemoveFromRecent(e, file.id)}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[200px] text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p className="text-sm text-gray-500">No recent files</p>
+                    <p className="text-xs text-gray-400 mt-1">Upload a file to get started</p>
+                  </div>
+                )}
               </div>
             </div>
+            
+            {/* Preview Section - Spans Full Width */}
+            {csvData && !isLoading && (
+              <div className="bg-white rounded-xl shadow-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>
+                    <button 
+                      className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm"
+                      onClick={handleImportFile}
+                    >
+                      Import
+                    </button>
+                    <button 
+                      className="px-3 py-1 text-sm bg-error text-white rounded-md shadow-sm"
+                      onClick={handleClearFile}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-base-200 text-left">
+                      <tr>
+                        {csvData.headers.map((header, index) => (
+                          <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {csvData.rows.slice(0, 10).map((row, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-base-200/30">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            {/* Error message display */}
+            {error && (
+              <div className="mt-2 p-3 bg-error/10 border border-error/20 rounded-md flex items-center text-sm text-error">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+            
+            {/* Add your preview section here */}
           </>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="col-span-1 md:col-span-2 lg:col-span-3">
+            <div className="bg-white rounded-xl shadow-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-800">Configuration</h2>
+                  <p className="text-sm text-gray-600">Configure input/output files and settings</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-base-200 rounded-lg p-6">
+                  <h3 className="font-medium mb-3">Application Settings</h3>
+                  <div className="space-y-4">
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium">API Key</label>
+                      <input type="password" className="px-3 py-2 border rounded-md" placeholder="Enter your API key" />
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium">Output Directory</label>
+                      <input type="text" className="px-3 py-2 border rounded-md" placeholder="Select output directory" />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input type="checkbox" className="checkbox" />
+                      <span className="text-sm">Save results automatically</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-base-200 rounded-lg p-6">
+                  <h3 className="font-medium mb-3">Advanced Settings</h3>
+                  <div className="space-y-4">
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium">Model</label>
+                      <select className="px-3 py-2 border rounded-md">
+                        <option>Default</option>
+                        <option>Fast</option>
+                        <option>Precise</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium">Processing Threads</label>
+                      <input type="number" className="px-3 py-2 border rounded-md" defaultValue={4} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end mt-6">
+                <button className="px-4 py-2 bg-primary text-white rounded-md shadow-sm">Save Settings</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'data' && (
@@ -108,7 +374,7 @@ const App: React.FC = () => {
                   <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
                 </div>
               </div>
-              <div className="bg-base-200 rounded-lg p-6 flex items-center justify-center min-h-[300px]">
+              <div className="bg-base-200 rounded-lg p-6 h-[300px] flex items-center justify-center min-h-[300px]">
                 <div className="text-center text-gray-500">Data Preview (Coming Soon)</div>
               </div>
             </div>

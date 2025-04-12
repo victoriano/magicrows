@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary: hsl(230, 85%, 53%);
+  --primary-focus: hsl(230, 85%, 45%);
+}
+
 @layer components {
   .placeholder {
     @apply flex items-center justify-center p-8 bg-base-300 text-base-content bg-opacity-50 rounded-lg;

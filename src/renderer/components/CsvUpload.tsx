@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Papa from 'papaparse';
+import { useDispatch } from 'react-redux';
+import { setData, setLoading, setError } from '../store/slices/dataSlice';
 
 interface CsvData {
   data: string[][];
@@ -9,12 +11,13 @@ interface CsvData {
 const CsvUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<CsvData | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setIsLoading] = useState<boolean>(false);
+  const [error, setErrorMessage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const dragCounter = useRef<number>(0);
+  const dispatch = useDispatch();
 
   // Use useEffect to handle drag and drop events at the document level
   useEffect(() => {
@@ -50,7 +53,7 @@ const CsvUpload: React.FC = () => {
         }
       } catch (err) {
         console.error('Error handling dropped file:', err);
-        setError(`Error handling dropped file: ${err instanceof Error ? err.message : String(err)}`);
+        setErrorMessage(`Error handling dropped file: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
 
@@ -83,8 +86,9 @@ const CsvUpload: React.FC = () => {
   };
 
   const parseCSV = (file: File) => {
-    setLoading(true);
-    setError(null);
+    setIsLoading(true);
+    setErrorMessage(null);
+    dispatch(setLoading(true));
 
     try {
       Papa.parse(file, {
@@ -94,28 +98,48 @@ const CsvUpload: React.FC = () => {
               // Extract headers from the first row
               const headers = results.data[0] as string[];
               // The rest are data rows
-              const data = results.data.slice(1) as string[][];
-              setCsvData({ data, headers });
+              const rows = results.data.slice(1) as string[][];
+              
+              setCsvData({ data: rows, headers });
+              
+              // Update Redux store with CSV data and file info
+              dispatch(setData({
+                headers,
+                rows,
+                fileName: file.name,
+                filePath: file.path || `${file.name}_${Date.now()}` // Use file path if available, or create a unique identifier
+              }));
             } else {
-              setError('No data found in the CSV file');
+              const errorMsg = 'No data found in the CSV file';
+              setErrorMessage(errorMsg);
+              dispatch(setError(errorMsg));
             }
           } catch (e) {
             console.error('Error processing CSV data:', e);
-            setError(`Error processing CSV data: ${e instanceof Error ? e.message : String(e)}`);
+            const errorMsg = `Error processing CSV data: ${e instanceof Error ? e.message : String(e)}`;
+            setErrorMessage(errorMsg);
+            dispatch(setError(errorMsg));
           } finally {
-            setLoading(false);
+            setIsLoading(false);
+            dispatch(setLoading(false));
           }
         },
         error: (error) => {
           console.error('PapaParse error:', error);
-          setError(`Error parsing CSV: ${error.message}`);
-          setLoading(false);
+          const errorMsg = `Error parsing CSV: ${error.message}`;
+          setErrorMessage(errorMsg);
+          dispatch(setError(errorMsg));
+          setIsLoading(false);
+          dispatch(setLoading(false));
         }
       });
     } catch (e) {
       console.error('Error while parsing CSV:', e);
-      setError(`Error while parsing CSV: ${e instanceof Error ? e.message : String(e)}`);
-      setLoading(false);
+      const errorMsg = `Error while parsing CSV: ${e instanceof Error ? e.message : String(e)}`;
+      setErrorMessage(errorMsg);
+      dispatch(setError(errorMsg));
+      setIsLoading(false);
+      dispatch(setLoading(false));
     }
   };
 
@@ -125,6 +149,12 @@ const CsvUpload: React.FC = () => {
     setCsvData(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const importFile = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
@@ -193,7 +223,15 @@ const CsvUpload: React.FC = () => {
         <div className="mt-4">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-medium text-gray-700">Preview</h3>
-            <span className="text-xs text-gray-500">{csvData.data.length} rows total</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500">{csvData.data.length} rows total</span>
+              <button 
+                className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm"
+                onClick={importFile}
+              >
+                Import
+              </button>
+            </div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto max-h-[200px]">

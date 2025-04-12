@@ -1,6 +1,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './build/icon', // Path without extension for proper icon format selection
   },
   rebuildConfig: {},
   makers: [
@@ -20,22 +21,26 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {},
     },
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {
+        icon: './build/icon.icns', // Using the converted ICNS file for DMG
+        format: 'ULFO',
+        name: 'Rowvana'
+      }
+    }
   ],
   plugins: [
     {
       name: '@electron-forge/plugin-vite',
       config: {
-        // `build` can specify multiple entry builds, which can be
-        // Main process, Preload scripts, Worker process, etc.
         build: [
           {
-            // `entry` is just an alias for `build.lib.entry`
-            // in the corresponding file of `config`.
             entry: 'src/main/main.ts',
             config: 'vite.main.config.ts',
           },
           {
-            entry: 'src/main/preload.ts',
+            entry: 'src/preload/preload.ts',
             config: 'vite.preload.config.ts',
           },
         ],
@@ -43,7 +48,6 @@ module.exports = {
           {
             name: 'main_window',
             config: 'vite.renderer.config.ts',
-            entry: 'src/renderer/index.html',
           },
         ],
       },
@@ -52,8 +56,7 @@ module.exports = {
   electronRebuildConfig: {},
   hooks: {
     generateAssets: async () => {
-      // Set NODE_ENV for dev mode
       process.env.NODE_ENV = 'development';
     }
   }
-}; 
+};

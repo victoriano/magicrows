@@ -3,6 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles } from './store/slices/dataSlice';
 import Papa from 'papaparse';
+// Fix the logo import to use a relative path that will work in production
+import logoImgPath from '../assets/rowvana_logo.png?url';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('import');
@@ -200,7 +202,10 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
+          <div className="flex items-center">
+            <img src={logoImgPath} alt="Rowvana Logo" className="h-8 mr-2" />
+            <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
+          </div>
           <div className="flex space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
             {['Import', 'Data', 'Process', 'Results', 'Settings'].map((tab) => (
               <button
@@ -299,7 +304,7 @@ const App: React.FC = () => {
                         >
                           <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                           </div>
                           <div className="flex-1 min-w-0">
@@ -475,9 +480,7 @@ const App: React.FC = () => {
                       </p>
                     </div>
                     <div className="space-x-2">
-                      <button className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm">
-                        Process
-                      </button>
+                      <button className="px-3 py-1 text-sm bg-primary text-white rounded-md">Process</button>
                       <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
                     </div>
                   </div>

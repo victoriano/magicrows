@@ -1,11 +1,18 @@
 import { app, BrowserWindow, ipcMain, dialog, session } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
+import { existsSync } from 'fs'; // Import the synchronous existsSync function
 import http from 'http';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
+// Use try-catch to handle the case when the module is not found (macOS/Linux)
+try {
+  if (require('electron-squirrel-startup')) {
+    app.quit();
+  }
+} catch (e) {
+  // Not running on Windows or module not found, ignore the error
+  console.log('electron-squirrel-startup not found, continuing...');
 }
 
 // Keep a global reference of the window object to avoid garbage collection
@@ -101,9 +108,44 @@ const createWindow = async (): Promise<void> => {
       mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
     }
   } else {
-    // In production, load the index.html file
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    // In production, load the index.html file from the correct location
     console.log('Running in production mode');
+    
+    // We need to handle path resolution differently in a packaged app
+    let indexPath;
+    if (app.isPackaged) {
+      // When packaged, the rendered files are in the app.asar at a predictable location
+      indexPath = path.join(__dirname, '../renderer/index.html');
+      
+      // If the above doesn't work, try these alternative paths
+      if (!existsSync(indexPath)) {
+        console.log(`Index not found at ${indexPath}, trying alternative paths...`);
+        const possiblePaths = [
+          path.join(__dirname, '../../renderer/index.html'),
+          path.join(__dirname, '../index.html'),
+          path.join(process.resourcesPath, 'app.asar/renderer/index.html'),
+          path.join(process.resourcesPath, 'app.asar/.vite/build/index.html')
+        ];
+        
+        for (const testPath of possiblePaths) {
+          try {
+            if (existsSync(testPath)) {
+              indexPath = testPath;
+              console.log(`Found index at: ${indexPath}`);
+              break;
+            }
+          } catch (err) {
+            console.log(`Error checking path ${testPath}:`, err);
+          }
+        }
+      }
+    } else {
+      // For unpackaged production builds
+      indexPath = path.join(__dirname, '../renderer/index.html');
+    }
+    
+    console.log(`Loading index from: ${indexPath}`);
+    mainWindow.loadFile(indexPath);
   }
 
   // Emitted when the window is closed.

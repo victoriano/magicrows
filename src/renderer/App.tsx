@@ -1,6 +1,17 @@
 import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from './store';
+import { 
+  addProvider, 
+  updateProvider, 
+  removeProvider, 
+  setProviderActive,
+  Provider as ProviderType,
+  saveProviderApiKey,
+  deleteProviderApiKey,
+  checkProviderApiKey,
+  getProviderApiKey
+} from './store/slices/providerSlice';
+import { RootState, AppDispatch } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import Papa from 'papaparse';
 // Use absolute path from the file system for the logo in Electron
@@ -15,6 +26,28 @@ interface Provider {
   apiKey: string;
 }
 
+// Type declaration for window.electronAPI
+declare global {
+  interface Window {
+    electronAPI: {
+      openFile: () => Promise<string | null>;
+      saveFile: () => Promise<string | null>;
+      readFile: (path: string) => Promise<string>;
+      writeFile: (path: string, content: string) => Promise<boolean>;
+      getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
+      saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<boolean>;
+      restart: () => Promise<void>;
+      getAppInfo: () => Promise<{ version: string, platform: string }>;
+      secureStorage: {
+        getApiKey: (providerId: string) => Promise<string>;
+        setApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
+        deleteApiKey: (providerId: string) => Promise<boolean>;
+        hasApiKey: (providerId: string) => Promise<boolean>;
+      };
+    };
+  }
+}
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('import');
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -22,8 +55,7 @@ const App: React.FC = () => {
   const [dropzoneActive, setDropzoneActive] = useState(false);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   
-  // Provider integration states
-  const [providers, setProviders] = useState<Provider[]>([]);
+  // Provider states
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
   const [showEditProviderModal, setShowEditProviderModal] = useState(false);
   const [newProviderType, setNewProviderType] = useState('openai');
@@ -31,8 +63,11 @@ const App: React.FC = () => {
   const [newProviderApiKey, setNewProviderApiKey] = useState('');
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [editProviderApiKey, setEditProviderApiKey] = useState('');
-  const dispatch = useDispatch();
-  const { recentFiles, isLoading, csvData, error, currentFileName, currentFilePath } = useSelector((state: RootState) => state.data);
+  
+  // Redux
+  const dispatch = useDispatch<AppDispatch>();
+  const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data);
+  const providers = useSelector((state: RootState) => state.providers.providers);
   
   useEffect(() => {
     console.log('Recent files:', recentFiles);
@@ -224,6 +259,48 @@ const App: React.FC = () => {
     }
   };
 
+  // Helper function to safely access electronAPI
+  const safelyAccessElectronAPI = () => {
+    if (window.electronAPI) {
+      return window.electronAPI;
+    }
+    
+    // Fallback for development environment
+    console.warn('window.electronAPI is not available. Using mock implementation.');
+    return {
+      secureStorage: {
+        getApiKey: async (providerId: string) => {
+          console.log('MOCK: Getting API key for', providerId);
+          const key = localStorage.getItem(`api_key_${providerId}`);
+          return key || '';
+        },
+        setApiKey: async (providerId: string, apiKey: string) => {
+          console.log('MOCK: Setting API key for', providerId);
+          localStorage.setItem(`api_key_${providerId}`, apiKey);
+          return true;
+        },
+        deleteApiKey: async (providerId: string) => {
+          console.log('MOCK: Deleting API key for', providerId);
+          localStorage.removeItem(`api_key_${providerId}`);
+          return true;
+        },
+        hasApiKey: async (providerId: string) => {
+          console.log('MOCK: Checking if API key exists for', providerId);
+          return localStorage.getItem(`api_key_${providerId}`) !== null;
+        }
+      },
+      // Mock other methods as needed
+      openFile: async () => null,
+      saveFile: async () => null,
+      readFile: async () => '',
+      writeFile: async () => true,
+      getApiKeys: async () => ({}),
+      saveApiKeys: async () => true,
+      restart: async () => {},
+      getAppInfo: async () => ({ version: 'dev', platform: 'web' })
+    };
+  };
+
   // Handle toggling the dropdown menu
   const toggleDropdown = (provider: string) => {
     if (showDropdown === provider) {
@@ -234,11 +311,20 @@ const App: React.FC = () => {
   };
 
   // Handle removing a provider integration
-  const handleRemoveProvider = (providerId: string) => {
-    // In a real implementation, this would remove the API key from storage
-    console.log(`Removing ${providerId} integration`);
-    setProviders(providers.filter(provider => provider.id !== providerId));
+  const handleRemoveProvider = async (providerId: string) => {
+    // Close dropdown menu if open
     setShowDropdown(null);
+    
+    try {
+      // First delete the API key from secure storage
+      const api = safelyAccessElectronAPI();
+      await api.secureStorage.deleteApiKey(providerId);
+      
+      // Then remove from Redux state
+      dispatch(removeProvider(providerId));
+    } catch (error) {
+      console.error('Error removing provider:', error);
+    }
   };
 
   // Handle editing a provider
@@ -246,27 +332,72 @@ const App: React.FC = () => {
     const provider = providers.find(p => p.id === providerId);
     if (provider) {
       setEditingProvider(providerId);
-      setEditProviderApiKey(provider.apiKey);
+      setNewProviderName(provider.name);
+      
+      // Show the modal right away
       setShowEditProviderModal(true);
+      
+      // Then fetch the API key
+      try {
+        const api = safelyAccessElectronAPI();
+        api.secureStorage.getApiKey(providerId)
+          .then(apiKey => {
+            console.log(`Retrieved API key for ${providerId}: ${apiKey ? 'Found' : 'Not found'}`);
+            setEditProviderApiKey(apiKey || '');
+          })
+          .catch(error => {
+            console.error('Error retrieving API key:', error);
+          });
+      } catch (error) {
+        console.error('Failed to access secureStorage:', error);
+      }
+        
+      // Close the dropdown if open
+      setShowDropdown(null);
     }
-    setShowDropdown(null);
   };
 
   // Handle saving an edited provider
-  const handleSaveEditedProvider = () => {
+  const handleSaveEditedProvider = async () => {
     if (editingProvider) {
-      const newProviders = [...providers];
-      const index = newProviders.findIndex(p => p.id === editingProvider);
-      if (index !== -1) {
-        newProviders[index].apiKey = editProviderApiKey;
-        newProviders[index].isActive = !!editProviderApiKey;
-        setProviders(newProviders);
+      try {
+        // Update provider data in Redux
+        const provider = providers.find(p => p.id === editingProvider);
+        if (provider) {
+          // Update name if changed
+          if (provider.name !== newProviderName) {
+            dispatch(updateProvider({ 
+              id: editingProvider, 
+              name: newProviderName,
+              type: provider.type,
+              isActive: provider.isActive
+            }));
+          }
+          
+          // Save API key if provided
+          if (editProviderApiKey.trim()) {
+            const api = safelyAccessElectronAPI();
+            const success = await api.secureStorage.setApiKey(
+              editingProvider, 
+              editProviderApiKey
+            );
+            
+            if (success) {
+              console.log('API key updated successfully');
+            } else {
+              console.error('Failed to update API key');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error updating provider:', error);
+      } finally {
+        // Always close modal and reset state
+        setShowEditProviderModal(false);
+        setEditingProvider(null);
+        setEditProviderApiKey('');
+        setNewProviderName('');
       }
-      
-      // Close the modal
-      setShowEditProviderModal(false);
-      setEditingProvider(null);
-      setEditProviderApiKey('');
     }
   };
 
@@ -275,43 +406,71 @@ const App: React.FC = () => {
     setShowEditProviderModal(false);
     setEditingProvider(null);
     setEditProviderApiKey('');
+    setNewProviderName('');
   };
 
   // Handle adding a new provider
-  const handleAddProviderClick = () => {
-    // Generate default name based on provider type with sequential numbering
-    const baseProviderName = `my${newProviderType.charAt(0).toUpperCase() + newProviderType.slice(1)}`;
-    
-    // Check if providers with the same base name already exist
-    const existingProviders = providers.filter(p => 
-      p.name.startsWith(baseProviderName)
-    );
-    
-    if (existingProviders.length === 0) {
-      // No providers with this name exist, use the base name
-      setNewProviderName(baseProviderName);
-    } else {
-      // Find the highest number suffix
-      let highestNum = 1;
-      existingProviders.forEach(p => {
-        // Extract number from the end of the name if it exists
-        const match = p.name.match(new RegExp(`${baseProviderName}(\\d+)$`));
-        if (match && match[1]) {
-          const num = parseInt(match[1], 10);
-          if (num >= highestNum) {
-            highestNum = num + 1;
+  const handleAddProvider = async () => {
+    if (newProviderName.trim() && newProviderApiKey.trim()) {
+      try {
+        console.log('Starting handleAddProvider...');
+        
+        // Create a new provider ID
+        const newProviderId = Date.now().toString();
+        console.log('Generated new provider ID:', newProviderId);
+        
+        // Add provider to Redux store
+        const newProvider = {
+          id: newProviderId,
+          name: newProviderName.trim(),
+          type: newProviderType,
+          isActive: providers.length === 0 // First provider is active by default
+        };
+        
+        console.log('About to dispatch addProvider with:', JSON.stringify(newProvider));
+        dispatch(addProvider(newProvider));
+        
+        // Store API key securely
+        console.log('About to store API key securely...');
+        try {
+          const api = safelyAccessElectronAPI();
+          const success = await api.secureStorage.setApiKey(
+            newProviderId,
+            newProviderApiKey.trim()
+          );
+          
+          console.log('API key storage result:', success);
+          
+          if (!success) {
+            console.error('Failed to store API key - returned false');
           }
-        } else if (p.name === baseProviderName) {
-          // If exact match without number exists, start at 2
-          highestNum = Math.max(2, highestNum);
+        } catch (apiKeyError) {
+          console.error('Error specifically when storing API key:', apiKeyError);
+          throw apiKeyError; // Re-throw to be caught by the outer catch
         }
-      });
-      
-      // Set name with the next sequential number
-      setNewProviderName(`${baseProviderName}${highestNum}`);
+        
+        console.log('Provider added successfully');
+      } catch (error) {
+        // Log detailed error information
+        console.error('Error adding provider:', error);
+        console.error('Error type:', typeof error);
+        console.error('Error toString:', String(error));
+        
+        if (error instanceof Error) {
+          console.error('Error message:', error.message);
+          console.error('Error stack:', error.stack);
+        }
+      } finally {
+        // Always close modal
+        setShowAddProviderModal(false);
+        // Reset form fields
+        setNewProviderName('');
+        setNewProviderApiKey('');
+        setNewProviderType('openai');
+      }
+    } else {
+      console.log('Provider name or API key is empty - not adding provider');
     }
-    
-    setShowAddProviderModal(true);
   };
 
   // Handle provider type change in the modal
@@ -351,49 +510,67 @@ const App: React.FC = () => {
     }
   };
 
-  // Handle saving an API key
-  const handleSaveApiKey = (providerId: string) => {
-    // Update the provider's active status
-    const newProviders = [...providers];
-    const index = newProviders.findIndex(p => p.id === providerId);
-    if (index !== -1 && newProviders[index].apiKey) {
-      newProviders[index].isActive = true;
-      setProviders(newProviders);
-      setEditingProvider(null);
+  // Handle saving API key
+  const handleSaveApiKey = async (providerId: string, apiKey: string) => {
+    try {
+      // Store the API key securely
+      const api = safelyAccessElectronAPI();
+      const success = await api.secureStorage.setApiKey(providerId, apiKey);
+      if (success) {
+        // Update the provider's active status
+        dispatch(setProviderActive({ id: providerId, isActive: true }));
+      }
+    } catch (error) {
+      console.error('Error saving API key:', error);
     }
   };
 
   // Handle closing the add provider modal
-  const handleCloseModal = () => {
+  const handleCloseAddModal = () => {
     setNewProviderName('');
     setNewProviderApiKey('');
     setShowAddProviderModal(false);
   };
 
-  // Handle adding a new provider
-  const handleAddProvider = () => {
-    if (newProviderName.trim() && newProviderApiKey.trim()) {
-      // Create a unique ID for the provider
-      const timestamp = Date.now();
-      const newProviderId = `${newProviderType}_${timestamp}`;
-      
-      // Add the new provider
-      setProviders([
-        ...providers,
-        { 
-          id: newProviderId, 
-          name: newProviderName.trim(), 
-          type: newProviderType, 
-          isActive: true, 
-          apiKey: newProviderApiKey 
+  // Handle opening the add provider modal
+  const handleAddProviderClick = () => {
+    // Generate default name based on provider type with sequential numbering
+    const baseProviderName = `my${newProviderType.charAt(0).toUpperCase() + newProviderType.slice(1)}`;
+    
+    // Check if providers with the same base name already exist
+    const existingProviders = providers.filter(p => 
+      p.name.startsWith(baseProviderName)
+    );
+    
+    if (existingProviders.length === 0) {
+      // No providers with this name exist, use the base name
+      setNewProviderName(baseProviderName);
+    } else {
+      // Find the highest number suffix
+      let highestNum = 1;
+      existingProviders.forEach(p => {
+        // Extract number from the end of the name if it exists
+        const match = p.name.match(new RegExp(`${baseProviderName}(\\d+)$`));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num >= highestNum) {
+            highestNum = num + 1;
+          }
+        } else if (p.name === baseProviderName) {
+          // If exact match without number exists, start at 2
+          highestNum = Math.max(2, highestNum);
         }
-      ]);
+      });
       
-      // Reset the form
-      setNewProviderName('');
-      setNewProviderApiKey('');
-      setShowAddProviderModal(false);
+      // Set name with the next sequential number
+      setNewProviderName(`${baseProviderName}${highestNum}`);
     }
+    
+    // Clear the API key field
+    setNewProviderApiKey('');
+    
+    // Show the modal
+    setShowAddProviderModal(true);
   };
 
   return (
@@ -439,7 +616,7 @@ const App: React.FC = () => {
                     <div className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center bg-base-200">
                       <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
                       <div className="px-3 py-1 bg-base-100 rounded-md text-sm font-medium mb-2">
@@ -467,7 +644,7 @@ const App: React.FC = () => {
                       <div className="flex flex-col items-center">
                         <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                           </svg>
                         </div>
                         <p className="text-sm font-medium text-gray-600">Drag and drop your CSV file here</p>
@@ -487,11 +664,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-[200px]">
-                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : recentFiles.length > 0 ? (
+                {recentFiles.length > 0 ? (
                   <div className="h-[200px] overflow-y-auto">
                     <div className="space-y-3">
                       {recentFiles.map((file) => (
@@ -538,7 +711,7 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[200px] text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     <p className="text-sm text-gray-500">No recent files</p>
@@ -556,7 +729,7 @@ const App: React.FC = () => {
             </div>
             
             {/* Preview Section - Spans Full Width */}
-            {csvData && !isLoading && (
+            {csvData && (
               <div className="bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
@@ -600,14 +773,14 @@ const App: React.FC = () => {
             )}
             
             {/* Error message display */}
-            {error && (
+            {/* {error && (
               <div className="mt-2 p-3 bg-error/10 border border-error/20 rounded-md flex items-center text-sm text-error">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>{error}</span>
               </div>
-            )}
+            )} */}
             
             {/* Add your preview section here */}
           </>
@@ -691,7 +864,7 @@ const App: React.FC = () => {
                     </div>
                     
                     <div className="pt-2">
-                      <button className="w-full px-4 py-2 text-sm bg-primary text-white hover:bg-primary-focus rounded-md flex items-center justify-center"
+                      <button className="w-full px-4 py-2 text-sm bg-primary text-white rounded-md flex items-center justify-center"
                         onClick={handleAddProviderClick}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -801,6 +974,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Add New Provider</h3>
+            
             <div className="space-y-4">
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">Provider Type</label>
@@ -813,16 +987,18 @@ const App: React.FC = () => {
                   <option value="perplexity">Perplexity</option>
                 </select>
               </div>
+              
               <div className="flex flex-col space-y-1">
-                <label className="text-sm font-medium">Provider Name</label>
+                <label className="text-sm font-medium">Name</label>
                 <input
                   type="text"
                   className="px-3 py-2 border rounded-md"
-                  placeholder="e.g., My OpenAI"
+                  placeholder="Provider name"
                   value={newProviderName}
                   onChange={(e) => setNewProviderName(e.target.value)}
                 />
               </div>
+              
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">API Key</label>
                 <input
@@ -833,20 +1009,28 @@ const App: React.FC = () => {
                   onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
                   value={newProviderApiKey}
                   onChange={(e) => setNewProviderApiKey(e.target.value)}
+                  onPaste={(e) => {
+                    const pastedText = e.clipboardData.getData('text');
+                    setNewProviderApiKey(pastedText);
+                    e.preventDefault();
+                  }}
+                  onCut={(e) => e.stopPropagation()}
+                  onCopy={(e) => e.stopPropagation()}
                 />
               </div>
             </div>
+            
             <div className="flex justify-end space-x-2 mt-6">
               <button
-                className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50"
-                onClick={handleCloseModal}
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                onClick={handleCloseAddModal}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 text-sm bg-primary text-white rounded-md"
+                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-focus disabled:opacity-50"
+                disabled={!newProviderName.trim() || !newProviderApiKey.trim()}
                 onClick={handleAddProvider}
-                disabled={!newProviderName.trim()}
               >
                 Add Provider
               </button>
@@ -860,6 +1044,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Edit Provider</h3>
+            
             <div className="space-y-4">
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">API Key</label>
@@ -871,18 +1056,26 @@ const App: React.FC = () => {
                   onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
                   value={editProviderApiKey}
                   onChange={(e) => setEditProviderApiKey(e.target.value)}
+                  onPaste={(e) => {
+                    const pastedText = e.clipboardData.getData('text');
+                    setEditProviderApiKey(pastedText);
+                    e.preventDefault();
+                  }}
+                  onCut={(e) => e.stopPropagation()}
+                  onCopy={(e) => e.stopPropagation()}
                 />
               </div>
             </div>
+            
             <div className="flex justify-end space-x-2 mt-6">
               <button
-                className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50"
+                className="px-4 py-2 border rounded-md hover:bg-gray-50"
                 onClick={handleCloseEditModal}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 text-sm bg-primary text-white rounded-md"
+                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-focus"
                 onClick={handleSaveEditedProvider}
               >
                 Save Changes

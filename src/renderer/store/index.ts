@@ -6,6 +6,7 @@ import configReducer from './slices/configSlice';
 import dataReducer from './slices/dataSlice';
 import processingReducer from './slices/processingSlice';
 import resultsReducer from './slices/resultsSlice';
+import providerReducer from './slices/providerSlice';
 
 // For debugging
 console.log('Setting up Redux store');
@@ -14,7 +15,7 @@ console.log('Setting up Redux store');
 const persistConfig = {
   key: 'root',
   storage,
-  whitelist: ['data'] // Only persist the data slice
+  whitelist: ['data', 'providers'] // Persist both data and providers
 };
 
 const rootReducer = combineReducers({
@@ -22,6 +23,7 @@ const rootReducer = combineReducers({
   data: dataReducer,
   processing: processingReducer,
   results: resultsReducer,
+  providers: providerReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

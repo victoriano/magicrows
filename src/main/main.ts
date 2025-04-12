@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs'; // Import the synchronous existsSync function
 import http from 'http';
+import { initSecureStorage } from './secureStorage';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 // Use try-catch to handle the case when the module is not found (macOS/Linux)
@@ -265,6 +266,9 @@ ipcMain.handle('config:saveApiKeys', (_, keys) => {
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
   createWindow();
+  
+  // Initialize secure storage
+  initSecureStorage();
 
   app.on('activate', () => {
     // On macOS it's common to re-create a window when clicking on the dock icon

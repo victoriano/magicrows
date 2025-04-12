@@ -20,6 +20,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('config:saveApiKeys', keys),
   restart: () => ipcRenderer.invoke('app:restart'),
   getAppInfo: () => ipcRenderer.invoke('app:getInfo'),
+  
+  // Secure storage for API keys
+  secureStorage: {
+    getApiKey: (providerId: string) => ipcRenderer.invoke('secure-storage:get-api-key', providerId),
+    setApiKey: (providerId: string, apiKey: string) => ipcRenderer.invoke('secure-storage:set-api-key', providerId, apiKey),
+    deleteApiKey: (providerId: string) => ipcRenderer.invoke('secure-storage:delete-api-key', providerId),
+    hasApiKey: (providerId: string) => ipcRenderer.invoke('secure-storage:has-api-key', providerId),
+  },
 });
 
 // The type definition for the exposed API
@@ -29,17 +37,19 @@ declare global {
       openFile: () => Promise<string | null>;
       saveFile: () => Promise<string | null>;
       readFile: (path: string) => Promise<string>;
-      writeFile: (path: string, content: string) => Promise<void>;
+      writeFile: (path: string, content: string) => Promise<boolean>;
       getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
-      saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<void>;
+      saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<boolean>;
       restart: () => Promise<void>;
-      getAppInfo: () => Promise<{
-        appPath: string;
-        resourcesPath: string;
-        isPackaged: boolean;
-        version: string;
-        platform: string;
-      }>;
-    }
+      getAppInfo: () => Promise<{ version: string, platform: string }>;
+      
+      // Secure storage for API keys
+      secureStorage: {
+        getApiKey: (providerId: string) => Promise<string>;
+        setApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
+        deleteApiKey: (providerId: string) => Promise<boolean>;
+        hasApiKey: (providerId: string) => Promise<boolean>;
+      };
+    };
   }
 }

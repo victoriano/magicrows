@@ -5,7 +5,7 @@ import { setData, setLoading, removeRecentFile, clearData } from './store/slices
 import Papa from 'papaparse';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('config');
+  const [activeTab, setActiveTab] = useState('import');
   const dispatch = useDispatch();
   const { recentFiles, isLoading, csvData, error, currentFileName, currentFilePath } = useSelector((state: RootState) => state.data);
   
@@ -123,7 +123,7 @@ const App: React.FC = () => {
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
           <div className="flex space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
-            {['Config', 'Data', 'Process', 'Results', 'Settings'].map((tab) => (
+            {['Import', 'Data', 'Process', 'Results', 'Settings'].map((tab) => (
               <button
                 key={tab}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -141,7 +141,7 @@ const App: React.FC = () => {
       </header>
 
       <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
-        {activeTab === 'config' && (
+        {activeTab === 'import' && (
           <>
             <div className="grid grid-cols-3 gap-6">
               {/* Data Upload Section */}
@@ -242,7 +242,7 @@ const App: React.FC = () => {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[200px] text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     <p className="text-sm text-gray-500">No recent files</p>
                     <p className="text-xs text-gray-400 mt-1">Upload a file to get started</p>
@@ -260,7 +260,7 @@ const App: React.FC = () => {
                     <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>
                     <button 
                       className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm"
-                      onClick={handleImportFile}
+                      onClick={() => setActiveTab('data')}
                     >
                       Import
                     </button>
@@ -362,22 +362,65 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'data' && (
-          <div className="col-span-1 md:col-span-2 lg:col-span-3">
-            <div className="bg-white rounded-xl shadow-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Data Preview</h2>
-                  <p className="text-sm text-gray-600">View and filter uploaded data</p>
+          <div className="space-y-6">
+            {csvData ? (
+              <>
+                <div className="bg-white rounded-xl shadow-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-800">Imported Data</h2>
+                      <p className="text-sm text-gray-600">
+                        {currentFileName && `Current file: ${currentFileName}`}
+                      </p>
+                    </div>
+                    <div className="space-x-2">
+                      <button className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm">
+                        Process
+                      </button>
+                      <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-base-200 text-left sticky top-0">
+                        <tr>
+                          {csvData.headers.map((header, index) => (
+                            <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {csvData.rows.map((row, rowIndex) => (
+                          <tr key={rowIndex} className="hover:bg-base-200/30">
+                            {row.map((cell, cellIndex) => (
+                              <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Filter</button>
-                  <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
+              </>
+            ) : (
+              <div className="bg-white rounded-xl shadow-card p-6 text-center">
+                <div className="py-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">No Data Imported</h3>
+                  <p className="text-gray-500 max-w-md mx-auto mb-6">
+                    Import a CSV file from the Import tab to view and process your data.
+                  </p>
+                  <button 
+                    className="px-4 py-2 bg-primary text-white rounded-md shadow-sm"
+                    onClick={() => setActiveTab('import')}
+                  >
+                    Go to Import
+                  </button>
                 </div>
               </div>
-              <div className="bg-base-200 rounded-lg p-6 h-[300px] flex items-center justify-center min-h-[300px]">
-                <div className="text-center text-gray-500">Data Preview (Coming Soon)</div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NACE/ISCO Task Generator</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' localhost:5173; img-src 'self' data:;" />
+    <script>
+      console.log('HTML template loaded');
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM fully loaded');
+        console.log('Root element exists:', !!document.getElementById('root'));
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root" style="min-height: 100vh;">
+      <!-- React will mount here -->
+      <div id="loading-indicator" style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif;">
+        <div style="text-align: center;">
+          <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto;"></div>
+          <p style="margin-top: 20px;">Loading application...</p>
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html> 

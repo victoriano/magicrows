@@ -159,7 +159,7 @@ const CsvUpload: React.FC = () => {
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full flex flex-col">
       <div 
         ref={dropZoneRef}
         className={`flex flex-col items-center justify-center h-[200px] border ${isDragging ? 'border-primary border-2' : 'border-gray-200'} rounded-lg p-6 text-center cursor-pointer bg-base-200 transition-all hover:bg-base-200/70`}
@@ -220,7 +220,7 @@ const CsvUpload: React.FC = () => {
       )}
 
       {csvData && !loading && (
-        <div className="mt-4">
+        <div className="mt-4 flex-1 flex flex-col">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-medium text-gray-700">Preview</h3>
             <div className="flex items-center space-x-2">
@@ -233,10 +233,10 @@ const CsvUpload: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto max-h-[200px]">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex-1 flex flex-col">
+            <div className="overflow-x-auto flex-1 max-h-full">
               <table className="w-full text-sm">
-                <thead className="bg-base-200 text-left">
+                <thead className="bg-base-200 text-left sticky top-0 z-10">
                   <tr>
                     {csvData.headers.map((header, index) => (
                       <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>

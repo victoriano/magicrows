@@ -14,6 +14,8 @@ import {
 import { RootState, AppDispatch } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import Papa from 'papaparse';
+// Import AI Enrichment components
+import { AIEnrichmentSelector, DatasetSelector, ProcessingStatusIndicator } from './components/AIEnrichment';
 
 // Import the logo image directly - this ensures Vite will process it correctly
 import magicRowsLogo from '../assets/magicrows_logo.png';
@@ -970,6 +972,16 @@ const App: React.FC = () => {
                       <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
                     </div>
                   </div>
+
+                  {/* AI Enrichment Panel */}
+                  <AIEnrichmentSelector />
+                  
+                  {/* Processing Status Indicator */}
+                  <ProcessingStatusIndicator />
+                  
+                  {/* Dataset Selector */}
+                  <DatasetSelector />
+                  
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-base-200 text-left sticky top-0">

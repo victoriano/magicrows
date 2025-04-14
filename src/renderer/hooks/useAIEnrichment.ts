@@ -1,102 +1,78 @@
-import { useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../store';
+import { RootState, AppDispatch } from '../store';
 import {
   selectPreset,
-  clearSelection,
   setActiveDataset,
-  resetEnrichmentState,
   processDataWithAI,
-  selectAIEnrichmentState,
-  selectPresets,
-  selectSelectedPreset,
-  selectEnrichmentStatus,
-  selectActiveDataset,
-  selectEnrichmentResult,
-  selectEnrichmentError,
-  EnrichmentPreset,
-  EnrichmentStatus
+  EnrichmentPreset
 } from '../store/slices/aiEnrichmentSlice';
 
 /**
- * Custom hook for AI Enrichment functionality
- * Provides access to AI enrichment state and actions
+ * Hook for accessing and manipulating AI Enrichment state
  */
-export const useAIEnrichment = () => {
-  const dispatch = useDispatch();
+export function useAIEnrichment() {
+  const dispatch = useDispatch<AppDispatch>();
+  const {
+    presets,
+    selectedPresetId,
+    status,
+    error,
+    activeDataset,
+    result
+  } = useSelector((state: RootState) => state.aiEnrichment);
+
+  // Derived state
+  const selectedPreset = selectedPresetId 
+    ? presets.find(preset => preset.id === selectedPresetId) || null 
+    : null;
   
-  // Select state using selectors
-  const presets = useSelector(selectPresets);
-  const selectedPreset = useSelector(selectSelectedPreset);
-  const status = useSelector(selectEnrichmentStatus);
-  const activeDataset = useSelector(selectActiveDataset);
-  const result = useSelector(selectEnrichmentResult);
-  const error = useSelector(selectEnrichmentError);
-  const enrichmentState = useSelector(selectAIEnrichmentState);
+  const hasEnrichedData = !!result && 
+    ((result.newRows && result.newRows.length > 0) || 
+     (result.newHeaders && result.newHeaders.length > 0));
   
-  // Action creators wrapped in dispatch
-  const selectEnrichmentPreset = useCallback(
-    (presetId: string) => dispatch(selectPreset(presetId)), 
-    [dispatch]
-  );
-  
-  const clearEnrichmentSelection = useCallback(
-    () => dispatch(clearSelection()), 
-    [dispatch]
-  );
-  
-  const switchActiveDataset = useCallback(
-    (dataset: 'original' | 'enriched') => dispatch(setActiveDataset(dataset)), 
-    [dispatch]
-  );
-  
-  const resetEnrichment = useCallback(
-    () => dispatch(resetEnrichmentState()), 
-    [dispatch]
-  );
-  
-  const processData = useCallback(
-    () => dispatch(processDataWithAI()), 
-    [dispatch]
-  );
-  
-  // Processing status helper methods
-  const isProcessing = status === 'processing';
-  const isSuccess = status === 'success';
-  const isError = status === 'error';
-  const isIdle = status === 'idle';
-  
-  // Dataset selection helper methods
-  const hasEnrichedData = result !== null && result.newRows !== undefined && result.newRows.length > 0;
-  const isShowingOriginalData = activeDataset === 'original';
-  const isShowingEnrichedData = activeDataset === 'enriched';
-  
+  const isShowingEnrichedData = activeDataset === 'enriched' && hasEnrichedData;
+
+  // Processing metrics - mock from result since we don't have it in the interface
+  const processingMetrics = result ? {
+    processed: result.processedRowCount || 0,
+    total: result.newRows?.length || 0,
+    timeElapsed: 0 // This would need to be tracked elsewhere
+  } : null;
+
+  // Actions
+  const selectEnrichmentPreset = (presetId: string) => {
+    dispatch(selectPreset(presetId));
+  };
+
+  const processDataWithAIAction = () => {
+    if (!selectedPresetId) return;
+    dispatch(processDataWithAI());
+  };
+
+  const toggleEnrichedView = (showEnriched: boolean) => {
+    dispatch(setActiveDataset(showEnriched ? 'enriched' : 'original'));
+  };
+
   return {
-    // State selectors
+    // State
     presets,
     selectedPreset,
     status,
-    activeDataset,
-    result,
     error,
-    enrichmentState,
+    activeDataset,
+    enrichmentResult: result,
+    processingMetrics,
     
-    // Action dispatchers
-    selectEnrichmentPreset,
-    clearEnrichmentSelection,
-    switchActiveDataset,
-    resetEnrichment,
-    processData,
-    
-    // Helper methods
-    isProcessing,
-    isSuccess,
-    isError,
-    isIdle,
+    // Derived state
     hasEnrichedData,
-    isShowingOriginalData,
-    isShowingEnrichedData
+    isShowingEnrichedData,
+    
+    // Actions
+    selectEnrichmentPreset,
+    processDataWithAI: processDataWithAIAction,
+    setActiveDataset: (dataset: 'original' | 'enriched') => dispatch(setActiveDataset(dataset)),
+    toggleEnrichedView
   };
-};
+}
 
 export default useAIEnrichment;

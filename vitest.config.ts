@@ -5,9 +5,9 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [react()],
   test: {
-    globals: true,
     environment: 'happy-dom',
-    setupFiles: ['./src/renderer/services/ai/__tests__/setupTests.ts'],
+    globals: true,
+    setupFiles: ['./src/vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     exclude: ['node_modules', 'dist', '.vite']
   },

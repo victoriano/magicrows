@@ -48,10 +48,8 @@ export interface EnrichmentProcessingResult {
  * Handles dataset processing through AI services according to configuration
  */
 export class AIEnrichmentProcessor {
-  private providerFactory: AIProviderFactory;
-
   constructor() {
-    this.providerFactory = new AIProviderFactory();
+    // No need to create an instance of the factory anymore
   }
 
   /**
@@ -74,8 +72,8 @@ export class AIEnrichmentProcessor {
     console.log(`Starting AI enrichment processing with ${config.integrationName}`);
     console.log(`Mode: ${config.mode}, Output format: ${config.outputFormat}`);
     
-    // Get the AI provider
-    const provider = this.providerFactory.getProviderByIntegration(config.integrationName);
+    // Get the AI provider using the static method
+    const provider = AIProviderFactory.getProviderByIntegration(config.integrationName);
     if (!provider) {
       throw new Error(`AI provider not found for integration: ${config.integrationName}`);
     }

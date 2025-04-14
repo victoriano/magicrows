@@ -437,9 +437,11 @@ const App: React.FC = () => {
       try {
         console.log('Starting handleAddProvider...');
         
-        // Create a new provider ID
-        const newProviderId = Date.now().toString();
-        console.log('Generated new provider ID:', newProviderId);
+        // Use the provider name as the ID instead of a timestamp or just the type
+        // This ensures API keys are stored with unique names while allowing multiple
+        // configurations for the same provider type (e.g., multiple OpenAI keys)
+        const newProviderId = newProviderName.trim();
+        console.log('Using provider name as ID:', newProviderId);
         
         // Add provider to Redux store
         const newProvider = {
@@ -452,7 +454,7 @@ const App: React.FC = () => {
         console.log('About to dispatch addProvider with:', JSON.stringify(newProvider));
         dispatch(addProvider(newProvider));
         
-        // Store API key securely
+        // Store API key securely - now using the provider name as the ID
         console.log('About to store API key securely...');
         try {
           const api = safelyAccessElectronAPI();
@@ -891,8 +893,8 @@ const App: React.FC = () => {
                       ) : (
                         <div className="bg-base-100 p-6 rounded-md border border-gray-200 flex flex-col items-center justify-center">
                           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 mb-3">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            <path d="M10 13a5 5 0 0 0-7.54.54l3-3a5 5 0 0 1 7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 1 7.07 7.07l1.71-1.71"></path>
                           </svg>
                           <p className="text-sm text-gray-500 mb-1">No API integrations configured</p>
                           <p className="text-xs text-gray-400 text-center mb-4">Add an integration to connect with AI providers</p>

@@ -7,6 +7,7 @@ import dataReducer from './slices/dataSlice';
 import processingReducer from './slices/processingSlice';
 import resultsReducer from './slices/resultsSlice';
 import providerReducer from './slices/providerSlice';
+import aiEnrichmentReducer from './slices/aiEnrichmentSlice';
 
 // For debugging
 console.log('Setting up Redux store');
@@ -15,7 +16,7 @@ console.log('Setting up Redux store');
 const persistConfig = {
   key: 'root',
   storage: electronStorage,
-  whitelist: ['data', 'providers'], // Persist both data and providers
+  whitelist: ['data', 'providers', 'aiEnrichment'], // Persist data, providers, and AI enrichment
   debug: true, // Enable debug mode for Redux persist
 };
 
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
   processing: processingReducer,
   results: resultsReducer,
   providers: providerReducer,
+  aiEnrichment: aiEnrichmentReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

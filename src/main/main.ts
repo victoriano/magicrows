@@ -78,6 +78,7 @@ const createWindow = async (): Promise<void> => {
   
   // Create the browser window.
   mainWindow = new BrowserWindow({
+    title: 'MagicRows',
     width: 1280,
     height: 720,
     webPreferences: {

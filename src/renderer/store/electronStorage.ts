@@ -44,7 +44,7 @@ const createElectronStorage = (): Storage => {
           window.electronAPI.getAppInfo()
             .then((appInfo) => {
               // First try using the user data directory integrated with app name
-              window.electronAPI.readFile(`rowvana-${key}.json`)
+              window.electronAPI.readFile(`magicrows-${key}.json`)
                 .then((content: string) => {
                   log(`Data retrieved from file, length: ${content.length}`);
                   resolve(content);
@@ -86,7 +86,7 @@ const createElectronStorage = (): Storage => {
           log('Attempting to write persisted data via electron API');
           
           // Using a temporary directory for storage
-          window.electronAPI.writeFile(`rowvana-${key}.json`, value)
+          window.electronAPI.writeFile(`magicrows-${key}.json`, value)
             .then(() => {
               log('Data successfully written to file');
               // Also save to localStorage as a backup
@@ -130,7 +130,7 @@ const createElectronStorage = (): Storage => {
           // Try to delete the file using the Electron API
           // Here we'd normally delete the file, but since we don't have a deleteFile method,
           // we'll just write an empty string to it
-          window.electronAPI.writeFile(`rowvana-${key}.json`, '')
+          window.electronAPI.writeFile(`magicrows-${key}.json`, '')
             .then(() => {
               log('Data file emptied');
               resolve();

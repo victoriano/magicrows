@@ -226,7 +226,7 @@ export function initSecureStorage() {
     
     // Create secure store with our integrated file storage
     secureStore = new SimpleFileStorage({
-      name: 'rowvana-secure-config',
+      name: 'magicrows-secure-config',
       encryptionKey: encryptionKey
     });
     
@@ -303,7 +303,7 @@ function generateEncryptionKey(): string {
   const hostname = os.hostname();
   const username = os.userInfo().username;
   const hash = crypto.createHash('sha256');
-  hash.update(`${hostname}-${username}-rowvana-secure-storage`);
+  hash.update(`${hostname}-${username}-magicrows-secure-storage`);
   return hash.digest('hex').substring(0, 32); // Use first 32 chars (16 bytes)
 }
 

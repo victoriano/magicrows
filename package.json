@@ -1,7 +1,7 @@
 {
-  "name": "rowvana",
+  "name": "magicrows",
   "version": "0.1.0",
-  "description": "Rowvana - A data processing and analysis tool for AI automation tasks",
+  "description": "MagicRows - A data processing and analysis tool for AI automation tasks",
   "main": ".vite/main/main.js",
   "scripts": {
     "start": "electron-forge start",

@@ -1,14 +1,14 @@
-# NACE/ISCO Task Generator - Electron App
+# MagicRows - Data Processing & AI Automation Tool
 
-An Electron application for generating AI-automatable tasks for combinations of NACE (industry) and ISCO (occupation) codes.
+An Electron application for processing data and leveraging AI APIs for automation tasks.
 
 ## Overview
 
-This application is a TypeScript port of a Python script that:
-1. Loads CSV data containing NACE/ISCO combinations
-2. Filters data based on various criteria
-3. Uses OpenAI and/or Perplexity APIs to generate tasks that could be automated with AI
-4. Outputs the results to a CSV file
+This application helps users:
+1. Load and process CSV data 
+2. Interact with AI providers like OpenAI and Perplexity
+3. Apply AI transformations to your data
+4. Export processed results
 
 ## Tech Stack
 

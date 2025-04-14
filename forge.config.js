@@ -8,9 +8,13 @@ module.exports = {
     extraResource: [
       // Add any additional resources here
     ],
+    // Ensure complete renaming across all references
+    executableName: 'MagicRows',
+    applicationName: 'MagicRows',
+    name: 'MagicRows',
+    productName: 'MagicRows',
+    appBundleId: 'com.magicrows.app',
     // Ensure native modules are properly built for the target platform
-    executableName: 'Rowvana',
-    // Add these options for native modules
     ignore: [
       "/node_modules/electron-store/node_modules/(?!.yarn-integrity)",
       "/node_modules/(?!electron-store)/.*"
@@ -44,7 +48,7 @@ module.exports = {
       config: {
         icon: './build/icon.icns', // Using the converted ICNS file for DMG
         format: 'ULFO',
-        name: 'Rowvana'
+        name: 'MagicRows'
       }
     }
   ],

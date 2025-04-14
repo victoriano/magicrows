@@ -16,7 +16,7 @@ import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updat
 import Papa from 'papaparse';
 
 // Import the logo image directly - this ensures Vite will process it correctly
-import rowvanaLogo from '../assets/rowvana_logo.png';
+import magicRowsLogo from '../assets/magicrows_logo.png';
 
 // Define the provider type
 interface Provider {
@@ -613,8 +613,8 @@ const App: React.FC = () => {
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <img src={rowvanaLogo} alt="Rowvana Logo" className="h-8 mr-2" />
-            <h1 className="text-xl font-bold text-gray-800">Rowvana</h1>
+            <img src={magicRowsLogo} alt="MagicRows Logo" className="h-8 mr-2" />
+            <h1 className="text-xl font-bold text-gray-800">MagicRows</h1>
           </div>
           <div className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
             {['Import', 'Data', 'Settings'].map((tab) => (
@@ -1017,7 +1017,7 @@ const App: React.FC = () => {
 
       <footer className="py-4 border-t bg-white mt-auto">
         <div className="container mx-auto px-6 text-center text-sm text-gray-500">
-          <p>Rowvana &copy; {new Date().getFullYear()} | Version 0.1.0</p>
+          <p>MagicRows &copy; {new Date().getFullYear()} | Version 0.1.0</p>
         </div>
       </footer>
 

@@ -6,6 +6,9 @@ import { store, persistor } from './store';
 import './styles/index.css';
 import App from './App';
 
+// Import AI provider initialization
+import './services/ai/initProviders';
+
 // Add timestamp to logs for easier debugging
 const log = (message: string, ...args: any[]) => {
   const timestamp = new Date().toISOString().split('T')[1].substring(0, 8);

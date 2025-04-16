@@ -217,29 +217,36 @@ class SimpleFileStorage {
 
 // Initialize secure storage - this will be called after the app is ready
 export function initSecureStorage() {
-  console.log('Initializing secure storage');
-  
   try {
-    // Generate encryption key
-    const encryptionKey = generateEncryptionKey();
-    console.log(`Generated encryption key (first 8 chars): ${encryptionKey.substring(0, 8)}...`);
+    console.log("SECURE STORAGE: Initializing secure storage");
+    console.log("SECURE STORAGE: User data path is", app.getPath('userData'));
     
-    // Create secure store with our integrated file storage
+    // Generate a stable encryption key based on machine-specific information
+    const encryptionKey = generateEncryptionKey();
+    
+    // Create the secure store with a name and encryption key
     secureStore = new SimpleFileStorage({
       name: 'magicrows-secure-config',
-      encryptionKey: encryptionKey
+      encryptionKey
     });
     
-    console.log('Secure storage initialized successfully');
+    console.log("SECURE STORAGE: File path is", (secureStore as any).filePath);
+    console.log("SECURE STORAGE: Keys in storage:", Object.keys((secureStore as any).data));
     
-    // Set up IPC handlers once the store is initialized
+    console.log('Secure storage initialized successfully');
     setupIpcHandlers();
+    
+    // Return success
+    return true;
   } catch (error) {
-    console.error('Error initializing secure storage:', error);
-    // Create a fallback in-memory store if needed
-    createFallbackStore();
-    // Still set up IPC handlers, but they'll use the fallback store
+    console.error('Failed to initialize secure storage:', error);
+    
+    // Fall back to a simpler storage mechanism
+    secureStore = createFallbackStore();
     setupIpcHandlers();
+    
+    // Return failure
+    return false;
   }
 }
 

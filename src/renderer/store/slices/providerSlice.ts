@@ -6,6 +6,8 @@ export interface Provider {
   name: string;
   type: string; // 'openai', 'perplexity', etc.
   isActive: boolean;
+  // Add a unique display ID to prevent React key issues
+  uniqueId?: string;
 }
 
 interface ProviderState {
@@ -46,10 +48,20 @@ export const saveProviderApiKey = createAsyncThunk(
 export const deleteProviderApiKey = createAsyncThunk(
   'providers/deleteApiKey',
   async (providerId: string) => {
-    const success = await window.electronAPI.secureStorage.deleteApiKey(providerId);
-    return { providerId, success };
+    try {
+      const success = await window.electronAPI.secureStorage.deleteApiKey(providerId);
+      return { providerId, success };
+    } catch (error) {
+      console.error('Error deleting API key:', error);
+      return { providerId, success: false };
+    }
   }
 );
+
+// Helper function to generate a unique display ID
+const generateUniqueId = (provider: Provider): string => {
+  return `${provider.type}-${provider.name}-${provider.id}`;
+};
 
 const providerSlice = createSlice({
   name: 'providers',
@@ -57,14 +69,24 @@ const providerSlice = createSlice({
   reducers: {
     // Add a new provider (without API key, which is stored separately)
     addProvider: (state, action: PayloadAction<Provider>) => {
-      state.providers.push(action.payload);
+      // Ensure each provider has a unique display ID
+      const provider = {
+        ...action.payload,
+        uniqueId: generateUniqueId(action.payload)
+      };
+      state.providers.push(provider);
     },
     
     // Update a provider's non-sensitive information
     updateProvider: (state, action: PayloadAction<Provider>) => {
       const index = state.providers.findIndex(p => p.id === action.payload.id);
       if (index !== -1) {
-        state.providers[index] = action.payload;
+        // Preserve uniqueId or generate a new one
+        const uniqueId = state.providers[index].uniqueId || generateUniqueId(action.payload);
+        state.providers[index] = {
+          ...action.payload,
+          uniqueId
+        };
       }
     },
     
@@ -87,14 +109,18 @@ const providerSlice = createSlice({
     
     // Set all providers
     setProviders: (state, action: PayloadAction<Provider[]>) => {
-      state.providers = action.payload;
+      // Ensure all providers have unique display IDs
+      state.providers = action.payload.map(provider => ({
+        ...provider,
+        uniqueId: provider.uniqueId || generateUniqueId(provider)
+      }));
     }
   },
   extraReducers: (builder) => {
     // Handle async operation statuses if needed
     builder
       .addCase(saveProviderApiKey.fulfilled, (state, action) => {
-        if (action.payload.success) {
+        if (action.payload && action.payload.success) {
           // If API key was saved successfully, ensure the provider is active
           const index = state.providers.findIndex(p => p.id === action.payload.providerId);
           if (index !== -1) {
@@ -103,7 +129,7 @@ const providerSlice = createSlice({
         }
       })
       .addCase(deleteProviderApiKey.fulfilled, (state, action) => {
-        if (action.payload.success) {
+        if (action.payload && action.payload.success) {
           // If API key was deleted successfully, deactivate the provider
           const index = state.providers.findIndex(p => p.id === action.payload.providerId);
           if (index !== -1) {

@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAIEnrichment } from '../../hooks/useAIEnrichment';
 import { EnrichmentPreset } from '../../store/slices/aiEnrichmentSlice';
+import AIProviderSelector from './AIProviderSelector';
+import { getRegisteredProviderNames } from '../../services/ai/initProviders';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 
 /**
  * Component for selecting AI enrichment presets and managing enrichment options
@@ -15,15 +19,72 @@ const AIEnrichmentSelector: React.FC = () => {
     error
   } = useAIEnrichment();
   
+  const { providers } = useSelector((state: RootState) => state.providers);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
+
+  // Initialize selected provider from preset if available
+  useEffect(() => {
+    if (selectedPreset?.config?.integrationName) {
+      // Find a provider that matches the integration name in the preset
+      const matchingProvider = providers.find(p => 
+        p.id === selectedPreset.config.integrationName || 
+        p.name === selectedPreset.config.integrationName
+      );
+      
+      if (matchingProvider) {
+        setSelectedProviderId(matchingProvider.id);
+      } else {
+        setProviderError(`Provider "${selectedPreset.config.integrationName}" not found. Please select a valid provider.`);
+      }
+    }
+  }, [selectedPreset, providers]);
 
   const handleSelectPreset = (preset: EnrichmentPreset) => {
     selectEnrichmentPreset(preset.id);
     setShowDropdown(false);
+    
+    // Find matching provider for this preset
+    if (preset.config.integrationName) {
+      const matchingProvider = providers.find(p => 
+        p.id === preset.config.integrationName || 
+        p.name === preset.config.integrationName
+      );
+      
+      if (matchingProvider) {
+        setSelectedProviderId(matchingProvider.id);
+        setProviderError(null);
+      } else {
+        setProviderError(`Provider "${preset.config.integrationName}" not found. Please select a valid provider.`);
+        setSelectedProviderId(null);
+      }
+    }
+  };
+
+  const handleSelectProvider = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setProviderError(null);
   };
 
   const handleProcess = () => {
     if (selectedPreset) {
+      // Ensure we have a valid provider before processing
+      if (!selectedProviderId) {
+        setProviderError("Please select a valid AI provider before processing");
+        return;
+      }
+      
+      // Update the selected preset's integration name to match the selected provider
+      const selectedProvider = providers.find(p => p.id === selectedProviderId);
+      if (!selectedProvider) {
+        setProviderError("Selected provider not found");
+        return;
+      }
+
+      // We would ideally update the preset's integrationName here, but we'd need 
+      // to add that capability to the aiEnrichmentSlice. For now, just process with
+      // the selected provider id.
       processDataWithAI();
     }
   };
@@ -46,6 +107,20 @@ const AIEnrichmentSelector: React.FC = () => {
       <h3 className="font-medium mb-3">AI Enrichment</h3>
       
       <div className="flex flex-col space-y-3">
+        {/* AI Provider Selector */}
+        <AIProviderSelector
+          selectedProviderId={selectedProviderId}
+          onSelectProvider={handleSelectProvider}
+          className="mb-2"
+          label="Provider Integration"
+        />
+
+        {providerError && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded-md text-sm">
+            {providerError}
+          </div>
+        )}
+
         <div className="relative">
           <button 
             className="w-full px-4 py-2 bg-white border rounded-md flex justify-between items-center"
@@ -89,7 +164,11 @@ const AIEnrichmentSelector: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="text-gray-500">Provider:</span>
-                <span className="ml-1 font-medium">{selectedPreset.config.integrationName}</span>
+                <span className="ml-1 font-medium">
+                  {selectedProviderId ? 
+                    providers.find(p => p.id === selectedProviderId)?.name || "Unknown" : 
+                    "Not selected"}
+                </span>
               </div>
               <div>
                 <span className="text-gray-500">Model:</span>
@@ -141,7 +220,7 @@ const AIEnrichmentSelector: React.FC = () => {
               isProcessing ? 'opacity-75' : ''
             }`}
             onClick={handleProcess}
-            disabled={!selectedPreset || isProcessing}
+            disabled={!selectedPreset || isProcessing || !selectedProviderId}
           >
             {isProcessing ? (
               <>

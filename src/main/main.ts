@@ -113,7 +113,7 @@ const createWindow = async (): Promise<void> => {
   // In development mode, load from vite dev server
   if (isDevelopment) {
     console.log('Running in development mode');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools(); // Commented out to prevent automatic DevTools opening
     
     // Find the active Vite server port (Vite might select a different port if 5173 is in use)
     const port = await findAvailablePort(5173, 5180);

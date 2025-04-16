@@ -840,8 +840,8 @@ const App: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex flex-col space-y-3">
                       {providers.length > 0 ? (
-                        providers.map(provider => (
-                          <div key={provider.id} className="bg-base-100 p-3 rounded-md border border-gray-200">
+                        providers.map((provider) => (
+                          <div key={provider.uniqueId || `provider-${provider.id}`} className="bg-base-100 p-3 rounded-md border border-gray-200">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
                                 <span className="font-medium text-sm">{provider.name}</span>
@@ -920,14 +920,14 @@ const App: React.FC = () => {
                       <div className="flex">
                         <input 
                           type="text" 
-                          className="px-3 py-2 border rounded-l-md flex-1" 
+                          className="input input-bordered rounded-r-none flex-1" 
                           placeholder="Select output directory" 
                           value={outputDirectory}
                           onChange={(e) => setOutputDirectory(e.target.value)}
                           readOnly
                         />
                         <button 
-                          className="px-3 py-2 bg-base-300 border border-l-0 rounded-r-md"
+                          className="btn btn-neutral rounded-l-none border-l-0"
                           onClick={handleBrowseDirectory}
                         >
                           Browse
@@ -941,7 +941,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">Processing Threads</label>
-                      <input type="number" className="px-3 py-2 border rounded-md" defaultValue={4} />
+                      <input type="number" className="input input-bordered w-full" defaultValue={4} />
                     </div>
                     <div className="flex items-center space-x-2">
                       <input type="checkbox" className="checkbox" />
@@ -951,7 +951,7 @@ const App: React.FC = () => {
                 </div>
               </div>
               <div className="flex justify-end mt-6">
-                <button className="px-4 py-2 bg-primary text-white rounded-md shadow-sm">Save Settings</button>
+                <button className="btn btn-primary">Save Settings</button>
               </div>
             </div>
           </div>
@@ -970,8 +970,8 @@ const App: React.FC = () => {
                       </p>
                     </div>
                     <div className="space-x-2">
-                      <button className="px-3 py-1 text-sm bg-primary text-white rounded-md">Process</button>
-                      <button className="px-3 py-1 text-sm bg-base-200 rounded-md">Export</button>
+                      <button className="btn btn-primary">Process</button>
+                      <button className="btn btn-ghost">Export</button>
                     </div>
                   </div>
 
@@ -1045,12 +1045,12 @@ const App: React.FC = () => {
               <div className="flex flex-col space-y-1">
                 <label className="text-sm font-medium">Provider Type</label>
                 <select 
-                  className="px-3 py-2 border rounded-md"
+                  className="select select-bordered w-full"
                   value={newProviderType}
                   onChange={(e) => handleProviderTypeChange(e.target.value)}
                 >
-                  <option value="openai">OpenAI</option>
-                  <option value="perplexity">Perplexity</option>
+                  <option key="provider-type-openai" value="openai">OpenAI</option>
+                  <option key="provider-type-perplexity" value="perplexity">Perplexity</option>
                 </select>
               </div>
               
@@ -1058,7 +1058,7 @@ const App: React.FC = () => {
                 <label className="text-sm font-medium">Name</label>
                 <input
                   type="text"
-                  className="px-3 py-2 border rounded-md"
+                  className="input input-bordered"
                   placeholder="Provider name"
                   value={newProviderName}
                   onChange={(e) => setNewProviderName(e.target.value)}
@@ -1069,7 +1069,7 @@ const App: React.FC = () => {
                 <label className="text-sm font-medium">API Key</label>
                 <input
                   type="text"
-                  className="px-3 py-2 border rounded-md font-mono"
+                  className="input input-bordered font-mono"
                   placeholder="Enter API key"
                   onFocus={(e) => e.target.type = 'text'}
                   onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
@@ -1088,13 +1088,13 @@ const App: React.FC = () => {
             
             <div className="flex justify-end space-x-2 mt-6">
               <button
-                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                className="btn btn-outline"
                 onClick={handleCloseAddModal}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-focus disabled:opacity-50"
+                className="btn btn-primary disabled:opacity-50"
                 disabled={!newProviderName.trim() || !newProviderApiKey.trim()}
                 onClick={handleAddProvider}
               >
@@ -1116,7 +1116,7 @@ const App: React.FC = () => {
                 <label className="text-sm font-medium">API Key</label>
                 <input
                   type="text"
-                  className="px-3 py-2 border rounded-md font-mono"
+                  className="input input-bordered font-mono"
                   placeholder="Enter API key"
                   onFocus={(e) => e.target.type = 'text'}
                   onBlur={(e) => e.target.value ? e.target.type = 'password' : e.target.type = 'text'}
@@ -1135,13 +1135,13 @@ const App: React.FC = () => {
             
             <div className="flex justify-end space-x-2 mt-6">
               <button
-                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                className="btn btn-outline"
                 onClick={handleCloseEditModal}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-focus"
+                className="btn btn-primary"
                 onClick={handleSaveEditedProvider}
               >
                 Save Changes

@@ -6,6 +6,7 @@ import {
   processDataWithAI,
   EnrichmentPreset
 } from '../store/slices/aiEnrichmentSlice';
+import { AIEnrichmentBlockConfig } from '../../shared/schemas/AIEnrichmentBlockSchema';
 
 /**
  * Hook for accessing and manipulating AI Enrichment state
@@ -44,9 +45,9 @@ export function useAIEnrichment() {
     dispatch(selectPreset(presetId));
   };
 
-  const processDataWithAIAction = () => {
-    if (!selectedPresetId) return;
-    dispatch(processDataWithAI());
+  const processDataWithAIAction = (overrideConfig?: AIEnrichmentBlockConfig) => {
+    if (!selectedPresetId && !overrideConfig) return;
+    dispatch(processDataWithAI(overrideConfig));
   };
 
   const toggleEnrichedView = (showEnriched: boolean) => {

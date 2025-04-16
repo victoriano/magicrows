@@ -2,28 +2,29 @@ import { AIEnrichmentBlockConfig, OutputConfig } from '../../../shared/schemas/A
 import { AIModelResponse, BaseAIProvider, ProcessPromptOptions } from './AIProvider';
 
 /**
- * Perplexity AI service implementation
+ * Perplexity service implementation
  * Handles API interactions with the Perplexity platform
  */
 export class PerplexityService extends BaseAIProvider {
   // Valid Perplexity models for enrichment tasks
   private static readonly SUPPORTED_MODELS = [
-    'pplx-7b-online',
-    'pplx-7b-chat',
-    'pplx-70b-online',
-    'pplx-70b-chat',
-    'llama-2-70b-chat',
-    'codellama-34b-instruct',
-    'mistral-7b-instruct',
-    'mixtral-8x7b-instruct',
+    'llama-3-sonar-small-32k-online',
+    'llama-3-sonar-small-32k',
+    'llama-3-sonar-large-32k', 
     'sonar-small-online',
     'sonar-small-chat',
     'sonar-medium-online',
-    'sonar-medium-chat'
+    'sonar-medium-chat',
+    'mistral-7b-instruct'
   ];
 
-  constructor() {
-    super('perplexity');
+  /**
+   * Create a new Perplexity service
+   * @param providerId The provider ID to use for API key lookup (defaults to 'perplexity')
+   */
+  constructor(providerId: string = 'perplexity') {
+    super(providerId);
+    console.log(`PerplexityService created with providerId: ${providerId}`);
   }
 
   /**

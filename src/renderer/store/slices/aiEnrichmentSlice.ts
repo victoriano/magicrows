@@ -116,18 +116,18 @@ const initialState: AIEnrichmentState = {
 // Create async thunk for processing data with AI enrichment
 export const processDataWithAI = createAsyncThunk<
   EnrichmentProcessingResult,
-  void,
+  AIEnrichmentBlockConfig | undefined,
   { state: RootState }
 >(
   'aiEnrichment/processData',
-  async (_, { getState, rejectWithValue }) => {
+  async (overrideConfig, { getState, rejectWithValue }) => {
     try {
       const state = getState();
       const { selectedPresetId, presets } = state.aiEnrichment;
       const { csvData } = state.data;
       
       // Validate requirements
-      if (!selectedPresetId) {
+      if (!selectedPresetId && !overrideConfig) {
         return rejectWithValue('No enrichment preset selected');
       }
       
@@ -135,16 +135,26 @@ export const processDataWithAI = createAsyncThunk<
         return rejectWithValue('No data available for processing');
       }
       
-      // Find the selected preset
-      const selectedPreset = presets.find(preset => preset.id === selectedPresetId);
-      if (!selectedPreset) {
-        return rejectWithValue(`Selected preset ${selectedPresetId} not found`);
+      // Determine which configuration to use
+      let configToUse: AIEnrichmentBlockConfig;
+      
+      if (overrideConfig) {
+        // Use the override configuration if provided
+        console.log('Using override configuration with integration:', overrideConfig.integrationName);
+        configToUse = overrideConfig;
+      } else {
+        // Otherwise find the selected preset
+        const selectedPreset = presets.find(preset => preset.id === selectedPresetId);
+        if (!selectedPreset) {
+          return rejectWithValue(`Selected preset ${selectedPresetId} not found`);
+        }
+        configToUse = selectedPreset.config;
       }
       
       // Process the data
       const processor = new AIEnrichmentProcessor();
       const result = await processor.processDataset(
-        selectedPreset.config,
+        configToUse,
         csvData.headers,
         csvData.rows
       );

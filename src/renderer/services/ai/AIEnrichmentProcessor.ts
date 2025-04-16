@@ -70,17 +70,48 @@ export class AIEnrichmentProcessor {
     }
 
     console.log(`Starting AI enrichment processing with ${config.integrationName}`);
-    console.log(`Mode: ${config.mode}, Output format: ${config.outputFormat}`);
+    
+    // DETAILED DEBUGGING
+    console.log('PROVIDER DEBUG: All registered provider integrations:', 
+      Array.from(AIProviderFactory.getAllProviderIntegrations().keys()));
+    console.log('PROVIDER DEBUG: All registered provider types:', 
+      Array.from(AIProviderFactory.getAllProviders()).keys());
     
     // Get the AI provider using the static method
     const provider = AIProviderFactory.getProviderByIntegration(config.integrationName);
+    
     if (!provider) {
+      console.error(`PROVIDER DEBUG: Provider not found for integration: ${config.integrationName}`);
       throw new Error(`AI provider not found for integration: ${config.integrationName}`);
     }
-
+    
+    console.log(`PROVIDER DEBUG: Provider found for integration: ${config.integrationName}`);
+    console.log(`PROVIDER DEBUG: Provider ID:`, (provider as any).providerId || 'unknown');
+    
     // Check if the provider is configured
     const isConfigured = await provider.isConfigured();
+    console.log(`PROVIDER DEBUG: Provider ${config.integrationName} configured:`, isConfigured);
+    
     if (!isConfigured) {
+      try {
+        const hasKey = await window.electronAPI.secureStorage.hasApiKey(config.integrationName);
+        console.log(`PROVIDER DEBUG: Direct storage check for ${config.integrationName}:`, hasKey);
+        
+        // Try also with different variations
+        const hasGenericKey = await window.electronAPI.secureStorage.hasApiKey(
+          config.integrationName.toLowerCase().includes('openai') ? 'openai' : 
+          config.integrationName.toLowerCase().includes('perplexity') ? 'perplexity' : 
+          'unknown'
+        );
+        console.log(`PROVIDER DEBUG: Direct storage check for generic key:`, hasGenericKey);
+        
+        // Show available keys in storage
+        console.log(`PROVIDER DEBUG: Available provider IDs in Redux store:`, 
+          'Cannot list all keys - API doesn\'t support this');
+      } catch (error) {
+        console.error('PROVIDER DEBUG: Error checking API keys:', error);
+      }
+      
       throw new Error(`AI provider ${config.integrationName} is not configured`);
     }
 

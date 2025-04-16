@@ -19,8 +19,13 @@ export class OpenAIService extends BaseAIProvider {
     'gpt-3.5-turbo-0125'
   ];
 
-  constructor() {
-    super('openai');
+  /**
+   * Create a new OpenAI service
+   * @param providerId The provider ID to use for API key lookup (defaults to 'openai')
+   */
+  constructor(providerId: string = 'openai') {
+    super(providerId);
+    console.log(`OpenAIService created with providerId: ${providerId}`);
   }
 
   /**

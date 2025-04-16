@@ -75,17 +75,19 @@ const AIEnrichmentSelector: React.FC = () => {
         return;
       }
       
-      // Update the selected preset's integration name to match the selected provider
-      const selectedProvider = providers.find(p => p.id === selectedProviderId);
-      if (!selectedProvider) {
-        setProviderError("Selected provider not found");
-        return;
-      }
-
-      // We would ideally update the preset's integrationName here, but we'd need 
-      // to add that capability to the aiEnrichmentSlice. For now, just process with
-      // the selected provider id.
-      processDataWithAI();
+      // Get the original configuration
+      const originalConfig = {...selectedPreset.config};
+      
+      // Override the integration name with the selected provider ID
+      // This is the key fix: use the selected provider ID from our dropdown
+      // instead of whatever was stored in the preset
+      const updatedConfig = {
+        ...originalConfig,
+        integrationName: selectedProviderId
+      };
+      
+      // Process with the updated configuration
+      processDataWithAI(updatedConfig);
     }
   };
 

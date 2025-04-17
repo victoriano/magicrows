@@ -1,6 +1,7 @@
 import { AIEnrichmentBlockConfig, OutputConfig } from '../../../shared/schemas/AIEnrichmentBlockSchema';
 import { AIModelResponse, ProcessPromptOptions } from './AIProvider';
 import { AIProviderFactory } from './AIProvider';
+import { ensureProvidersInitialized } from './initProviders';
 
 /**
  * Interface representing a row of data with its context
@@ -64,6 +65,13 @@ export class AIEnrichmentProcessor {
     headers: string[], 
     rows: string[][]
   ): Promise<EnrichmentProcessingResult> {
+    // Ensure that all provider integrations are registered with the latest Redux state.
+    // This is important because initProviders.ts may run before the Redux state is rehydrated,
+    // causing named integrations (e.g. "myOpenai") to be missing. Calling this function here
+    // guarantees that the most up‑to‑date provider list is (re)registered before we attempt
+    // to fetch a provider.
+    ensureProvidersInitialized();
+
     // Validate inputs
     if (!config || !headers || !rows || rows.length === 0) {
       throw new Error('Invalid input: configuration, headers, and rows are required');

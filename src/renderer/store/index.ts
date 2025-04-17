@@ -49,6 +49,9 @@ store.subscribe(() => {
   });
 });
 
+// Expose the store globally so late‑loaded modules (e.g. initProviders)
+// can access it without using CommonJS `require`, which isn't available
+// in the Vite/Electron renderer context.
 export const persistor = persistStore(store, null, () => {
   console.log('Redux persist rehydration complete');
   console.log('Current state after rehydration:', store.getState());

@@ -233,6 +233,27 @@ export function initSecureStorage() {
     console.log("SECURE STORAGE: File path is", (secureStore as any).filePath);
     console.log("SECURE STORAGE: Keys in storage:", Object.keys((secureStore as any).data));
     
+    // Verify that secure storage is working by testing read/write
+    try {
+      // Try to write a test key
+      const testKey = 'secure-storage-test';
+      const testValue = `test-value-${Date.now()}`;
+      secureStore.set(testKey, testValue);
+      
+      // Try to read the test key back
+      const readValue = secureStore.get(testKey);
+      
+      if (readValue === testValue) {
+        console.log('SECURE STORAGE: Self-test passed - storage is working correctly');
+      } else {
+        console.error('SECURE STORAGE: Self-test failed - read value does not match written value');
+        console.error(`- Written: "${testValue}"`);
+        console.error(`- Read: "${readValue}"`);
+      }
+    } catch (error) {
+      console.error('SECURE STORAGE: Self-test failed with error:', error);
+    }
+    
     console.log('Secure storage initialized successfully');
     setupIpcHandlers();
     
@@ -320,8 +341,37 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:get-api-key', (_, providerId: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      const key = secureStore.get(`apiKeys.${providerId}`) as string | undefined;
-      return key || '';
+      
+      console.log(`SECURE STORAGE: Getting API key for provider: ${providerId}`);
+      
+      // Try different key formats
+      const possibleKeys = [
+        providerId,
+        `apiKeys.${providerId}`
+      ];
+      
+      // If providerId contains openai/perplexity, also add the generic version
+      const genericType = providerId.toLowerCase().includes('openai') ? 'openai' : 
+                         providerId.toLowerCase().includes('perplexity') ? 'perplexity' : 
+                         null;
+      
+      if (genericType && genericType !== providerId) {
+        possibleKeys.push(genericType);
+        possibleKeys.push(`apiKeys.${genericType}`);
+      }
+      
+      // Try all possible key formats
+      for (const keyFormat of possibleKeys) {
+        const key = secureStore.get(keyFormat) as string | undefined;
+        if (key) {
+          console.log(`SECURE STORAGE: Found API key for ${providerId} using format: ${keyFormat}`);
+          console.log(`SECURE STORAGE: Key length: ${key.length} characters`);
+          return key;
+        }
+      }
+      
+      console.error(`SECURE STORAGE: No API key found for ${providerId} after trying formats:`, possibleKeys);
+      return '';
     } catch (error) {
       console.error('Error getting API key:', error);
       return '';
@@ -332,8 +382,21 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:set-api-key', (_, providerId: string, apiKey: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      secureStore.set(`apiKeys.${providerId}`, apiKey);
-      return true;
+      
+      console.log(`SECURE STORAGE: Setting API key for provider: ${providerId}`);
+      console.log(`SECURE STORAGE: Key length: ${apiKey.length} characters`);
+      
+      // Store directly by providerId and also with apiKeys. prefix for compatibility
+      const success1 = secureStore.set(providerId, apiKey);
+      const success2 = secureStore.set(`apiKeys.${providerId}`, apiKey);
+      
+      if (success1 && success2) {
+        console.log(`SECURE STORAGE: Successfully saved API key for ${providerId}`);
+      } else {
+        console.error(`SECURE STORAGE: Failed to save API key for ${providerId}`);
+      }
+      
+      return success1 && success2;
     } catch (error) {
       console.error('Error setting API key:', error);
       return false;
@@ -344,8 +407,14 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:delete-api-key', (_, providerId: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      secureStore.delete(`apiKeys.${providerId}`);
-      return true;
+      
+      console.log(`SECURE STORAGE: Deleting API key for provider: ${providerId}`);
+      
+      // Delete both direct and prefixed versions
+      const success1 = secureStore.delete(providerId);
+      const success2 = secureStore.delete(`apiKeys.${providerId}`);
+      
+      return success1 || success2;
     } catch (error) {
       console.error('Error deleting API key:', error);
       return false;
@@ -356,7 +425,35 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:has-api-key', (_, providerId: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      return secureStore.has(`apiKeys.${providerId}`);
+      
+      console.log(`SECURE STORAGE: Checking if API key exists for provider: ${providerId}`);
+      
+      // Try different key formats
+      const possibleKeys = [
+        providerId,
+        `apiKeys.${providerId}`
+      ];
+      
+      // If providerId contains openai/perplexity, also add the generic version
+      const genericType = providerId.toLowerCase().includes('openai') ? 'openai' : 
+                         providerId.toLowerCase().includes('perplexity') ? 'perplexity' : 
+                         null;
+      
+      if (genericType && genericType !== providerId) {
+        possibleKeys.push(genericType);
+        possibleKeys.push(`apiKeys.${genericType}`);
+      }
+      
+      // Check all possible key formats
+      for (const keyFormat of possibleKeys) {
+        if (secureStore.has(keyFormat)) {
+          console.log(`SECURE STORAGE: Found API key for ${providerId} using format: ${keyFormat}`);
+          return true;
+        }
+      }
+      
+      console.log(`SECURE STORAGE: No API key found for ${providerId}`);
+      return false;
     } catch (error) {
       console.error('Error checking API key:', error);
       return false;

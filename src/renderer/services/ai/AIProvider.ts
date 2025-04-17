@@ -110,11 +110,6 @@ export abstract class BaseAIProvider implements AIProvider {
     try {
       console.log(`Checking if provider ${this.providerId} is configured...`);
       
-      // EMERGENCY OVERRIDE: For demo/development purposes, always return true
-      // Remove this for production use
-      console.log(`OVERRIDE: Returning true for provider ${this.providerId} configuration check`);
-      return true;
-      
       // First try the exact provider ID
       const hasExactKey = await window.electronAPI.secureStorage.hasApiKey(this.providerId);
       if (hasExactKey) {
@@ -157,32 +152,19 @@ export abstract class BaseAIProvider implements AIProvider {
    */
   protected async getApiKey(): Promise<string> {
     try {
-      // First try the exact provider ID
-      let apiKey = await window.electronAPI.secureStorage.getApiKey(this.providerId);
-      if (apiKey) {
-        return apiKey;
+      console.log(`Getting API key for provider: ${this.providerId}`);
+      
+      // Use the EXACT same approach as the UI - get key by the exact provider ID
+      // No fancy fallbacks or conversions
+      const apiKey = await window.electronAPI.secureStorage.getApiKey(this.providerId);
+      
+      if (!apiKey) {
+        console.error(`No API key found for provider: ${this.providerId}`);
+        throw new Error(`Failed to get API key for ${this.providerId}`);
       }
       
-      // If not found and this is a named integration (e.g. "myOpenai"), try the generic type
-      const genericType = this.providerId.toLowerCase().includes('openai') ? 'openai' : 
-                         this.providerId.toLowerCase().includes('perplexity') ? 'perplexity' : 
-                         null;
-      
-      if (genericType && this.providerId !== genericType) {
-        apiKey = await window.electronAPI.secureStorage.getApiKey(genericType);
-        if (apiKey) {
-          return apiKey;
-        }
-      }
-      
-      // Try with apiKeys. prefix
-      const prefixedKey = `apiKeys.${this.providerId}`;
-      apiKey = await window.electronAPI.secureStorage.getApiKey(prefixedKey);
-      if (apiKey) {
-        return apiKey;
-      }
-      
-      throw new Error(`Failed to get API key for ${this.providerId}`);
+      console.log(`Successfully retrieved API key for ${this.providerId} (length: ${apiKey.length})`);
+      return apiKey;
     } catch (error) {
       console.error(`Error getting API key for ${this.providerId}:`, error);
       throw new Error(`Failed to get API key for ${this.providerId}`);
@@ -236,13 +218,37 @@ export class AIProviderFactory {
       return specificProvider;
     }
     
-    // If no specific integration found, fall back to type-based lookup
+    // If no specific integration found, create a provider with the EXACT SAME ID
+    // This ensures the API key lookup will use the original integration name
     const type = integrationName.toLowerCase().includes('openai') ? 'openai' : 
                  integrationName.toLowerCase().includes('perplexity') ? 'perplexity' : 
                  undefined;
     
-    console.log(`No specific provider found for "${integrationName}", falling back to type "${type}"`);
-    return type ? this.getProvider(type) : undefined;
+    if (type) {
+      console.log(`Creating custom provider for "${integrationName}" using type "${type}"`);
+      
+      // Get the base provider
+      const baseProvider = this.getProvider(type);
+      if (!baseProvider) {
+        console.error(`No provider found for type "${type}"`);
+        return undefined;
+      }
+      
+      // Create a new instance of the same provider type, but with the ORIGINAL integrationName as ID
+      if (type === 'openai') {
+        // Import here to avoid circular dependencies
+        const { OpenAIService } = require('./OpenAIService');
+        const customProvider = new OpenAIService(integrationName);
+        return customProvider;
+      } else if (type === 'perplexity') {
+        const { PerplexityService } = require('./PerplexityService');
+        const customProvider = new PerplexityService(integrationName);
+        return customProvider;
+      }
+    }
+    
+    console.error(`No provider found for integration "${integrationName}" and no fallback available`);
+    return undefined;
   }
 
   /**

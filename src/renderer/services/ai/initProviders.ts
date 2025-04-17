@@ -8,9 +8,6 @@ import { OpenAIService } from './OpenAIService';
 import { PerplexityService } from './PerplexityService';
 import { AIProviderFactory } from './AIProvider';
 
-// Import provider store to get existing provider configurations
-import { store } from '../../store';
-
 // Register provider types (for fallback)
 // These use the generic type names like 'openai' and 'perplexity'
 const openaiProvider = new OpenAIService();
@@ -19,11 +16,30 @@ AIProviderFactory.registerProvider('openai', openaiProvider);
 const perplexityProvider = new PerplexityService();
 AIProviderFactory.registerProvider('perplexity', perplexityProvider);
 
-// Register specific named provider integrations from the Redux store
-function registerNamedProviderIntegrations() {
+// Dynamically import the Redux store **inside** the function to avoid circular
+// dependency issues (initProviders → store → slices → initProviders).
+async function registerNamedProviderIntegrations(): Promise<void> {
+  let providers: any[] = [];
   try {
-    const state = store.getState();
-    const providers = state.providers.providers;
+    // Try to obtain the store from the global object first
+    let globalStore = (globalThis as any).magicRowsStore as any;
+
+    // If not yet available, dynamically import it (avoids `require` which is not
+    // available in the Vite renderer) – this guarantees we always end up with the
+    // actual store instance, even in cases where ensureProvidersInitialized is
+    // called before the window property is set.
+    if (!globalStore) {
+      try {
+        const storeModule = await import('../../store');
+        globalStore = storeModule.store;
+      } catch (e) {
+        console.error('registerNamedProviderIntegrations: failed to import store', e);
+        return;
+      }
+    }
+
+    const state = globalStore.getState();
+    providers = state.providers.providers;
     
     console.log('Registering named provider integrations:', providers.map(p => p.name));
     
@@ -52,8 +68,9 @@ function registerNamedProviderIntegrations() {
   }
 }
 
-// Call the registration function
-registerNamedProviderIntegrations();
+// NOTE: We no longer call registerNamedProviderIntegrations() at module load time
+// because the Redux store may not be ready yet. Consumers should call
+// ensureProvidersInitialized() after the store is configured/rehydrated.
 
 // Export a function to get all registered provider names
 export function getRegisteredProviderNames(): string[] {
@@ -75,7 +92,7 @@ export function getProviderInfo(): { types: string[], integrations: string[] } {
 console.log('AI Providers initialized:', getProviderInfo());
 
 // Initialize function that can be called to ensure providers are registered
-export function ensureProvidersInitialized(): void {
-  registerNamedProviderIntegrations();
+export async function ensureProvidersInitialized(): Promise<void> {
+  await registerNamedProviderIntegrations();
   console.log('AI Providers verified:', getProviderInfo());
 }

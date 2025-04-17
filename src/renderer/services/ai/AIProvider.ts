@@ -218,33 +218,35 @@ export class AIProviderFactory {
       return specificProvider;
     }
     
-    // If no specific integration found, create a provider with the EXACT SAME ID
-    // This ensures the API key lookup will use the original integration name
+    // If no specific integration found, check if it might be a custom variation of a known provider type
     const type = integrationName.toLowerCase().includes('openai') ? 'openai' : 
                  integrationName.toLowerCase().includes('perplexity') ? 'perplexity' : 
                  undefined;
     
     if (type) {
-      console.log(`Creating custom provider for "${integrationName}" using type "${type}"`);
+      console.log(`Looking for base provider with type "${type}" for "${integrationName}"`);
       
       // Get the base provider
       const baseProvider = this.getProvider(type);
       if (!baseProvider) {
-        console.error(`No provider found for type "${type}"`);
+        console.error(`No base provider found for type "${type}"`);
         return undefined;
       }
       
-      // Create a new instance of the same provider type, but with the ORIGINAL integrationName as ID
-      if (type === 'openai') {
-        // Import here to avoid circular dependencies
-        const { OpenAIService } = require('./OpenAIService');
-        const customProvider = new OpenAIService(integrationName);
-        return customProvider;
-      } else if (type === 'perplexity') {
-        const { PerplexityService } = require('./PerplexityService');
-        const customProvider = new PerplexityService(integrationName);
-        return customProvider;
-      }
+      // Use the base provider directly with the original integrationName
+      // This avoids instantiating new provider instances, which would require imports
+      // that could cause circular dependencies
+      console.log(`Using base provider for type "${type}" with integration name "${integrationName}"`);
+      
+      // Store the original providerId for reference
+      const originalProviderId = (baseProvider as any).providerId;
+      console.log(`Original provider ID: ${originalProviderId}, using: ${integrationName}`);
+      
+      // Temporarily modify the provider ID to match the integrationName
+      // This ensures API key lookup will use the correct ID
+      (baseProvider as any).providerId = integrationName;
+      
+      return baseProvider;
     }
     
     console.error(`No provider found for integration "${integrationName}" and no fallback available`);

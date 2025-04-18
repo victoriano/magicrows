@@ -9,6 +9,8 @@ interface AIProviderSelectorProps {
   className?: string;
   label?: string;
   enrichmentFunctionId?: string; // Optional - to filter providers specific to an enrichment function
+  providerType?: string; // Optional - to filter providers by type (e.g., 'openai' or 'perplexity')
+  isLoading?: boolean; // Added isLoading prop to show loading state
 }
 
 /**
@@ -20,18 +22,25 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
   onSelectProvider,
   className = '',
   label = 'AI Provider',
-  enrichmentFunctionId
+  enrichmentFunctionId,
+  providerType,
+  isLoading = false
 }) => {
-  const { providers, isLoading } = useSelector((state: RootState) => state.providers);
+  const { providers, isLoading: providersLoading } = useSelector((state: RootState) => state.providers);
   const [showDropdown, setShowDropdown] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({});
+
+  // Filter providers based on type if specified
+  const filteredProviders = providerType 
+    ? providers.filter(p => p.type === providerType)
+    : providers;
 
   // Check API key status for each provider
   useEffect(() => {
     const checkApiKeys = async () => {
       const statuses: Record<string, boolean> = {};
       
-      for (const provider of providers) {
+      for (const provider of filteredProviders) {
         try {
           const hasKey = await window.electronAPI.secureStorage.hasApiKey(provider.id);
           statuses[provider.id] = hasKey;
@@ -45,11 +54,11 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
     };
     
     checkApiKeys();
-  }, [providers]);
+  }, [filteredProviders]);
 
   // Get selected provider object
   const selectedProvider = selectedProviderId 
-    ? providers.find(p => p.id === selectedProviderId) 
+    ? filteredProviders.find(p => p.id === selectedProviderId) 
     : null;
 
   // Handle provider selection
@@ -66,6 +75,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
     };
   };
 
+  // Combined loading state (either from props or from provider state)
+  const isLoadingState = isLoading || providersLoading;
+
   return (
     <div className={`relative ${className}`}>
       {label && (
@@ -79,33 +91,43 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
           type="button"
           className="w-full px-4 py-2 bg-white border rounded-md flex justify-between items-center"
           onClick={() => setShowDropdown(!showDropdown)}
-          disabled={isLoading || providers.length === 0}
+          disabled={isLoadingState || filteredProviders.length === 0}
         >
-          <div className="flex items-center">
-            {selectedProvider ? (
-              <>
-                <span className="font-medium">{selectedProvider.name}</span>
-                <span className="ml-2 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
-                  {selectedProvider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
+          {isLoadingState ? (
+            <div className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-gray-500">Finding best provider...</span>
+            </div>
+          ) : (
+            <div className="flex items-center">
+              {selectedProvider ? (
+                <>
+                  <span className="font-medium">{selectedProvider.name}</span>
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
+                    {selectedProvider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
+                  </span>
+                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                    selectedProvider.isActive 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {selectedProvider.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-500">
+                  {providersLoading 
+                    ? 'Loading providers...' 
+                    : filteredProviders.length > 0 
+                      ? 'Select a provider' 
+                      : 'No providers available'}
                 </span>
-                <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                  selectedProvider.isActive 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {selectedProvider.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </>
-            ) : (
-              <span className="text-gray-500">
-                {isLoading 
-                  ? 'Loading providers...' 
-                  : providers.length > 0 
-                    ? 'Select a provider' 
-                    : 'No providers available'}
-              </span>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -118,9 +140,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
           </svg>
         </button>
 
-        {showDropdown && providers.length > 0 && (
+        {showDropdown && filteredProviders.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-            {providers.map((provider) => {
+            {filteredProviders.map((provider) => {
               const status = getProviderStatus(provider);
               return (
                 <button
@@ -160,9 +182,11 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
       </div>
 
       {/* Warning message if no providers are available */}
-      {!isLoading && providers.length === 0 && (
+      {!isLoadingState && filteredProviders.length === 0 && (
         <div className="mt-2 text-sm text-red-600">
-          No AI providers available. Add a provider in Settings.
+          {providerType 
+            ? `No ${providerType} providers available. Add a provider in Settings.`
+            : 'No AI providers available. Add a provider in Settings.'}
         </div>
       )}
       

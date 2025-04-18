@@ -35,7 +35,7 @@ const initialState: AIEnrichmentState = {
         integrationName: 'openai',
         model: 'gpt-3.5-turbo',
         mode: 'preview',
-        previewRowCount: 5,
+        previewRowCount: 2,
         outputFormat: 'newColumns',
         outputs: [
           {
@@ -64,7 +64,7 @@ const initialState: AIEnrichmentState = {
         integrationName: 'openai',
         model: 'gpt-3.5-turbo',
         mode: 'preview',
-        previewRowCount: 5,
+        previewRowCount: 2,
         outputFormat: 'newColumns',
         outputs: [
           {
@@ -88,7 +88,7 @@ const initialState: AIEnrichmentState = {
         integrationName: 'perplexity',
         model: 'sonar-small-online',
         mode: 'preview',
-        previewRowCount: 3,
+        previewRowCount: 2,
         outputFormat: 'newRows',
         contextColumns: ['name', 'description'],
         outputs: [

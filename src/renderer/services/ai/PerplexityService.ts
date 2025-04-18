@@ -91,6 +91,14 @@ export class PerplexityService extends BaseAIProvider {
       
       console.log(`Using Perplexity API endpoint: ${apiEndpoint}`);
 
+      // Create the request body
+      const requestBody = {
+        model: options.model,
+        messages,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: 1000
+      };
+
       // Log the request details (excluding sensitive info)
       console.log('Perplexity API Request:', {
         url: apiEndpoint,
@@ -107,46 +115,30 @@ export class PerplexityService extends BaseAIProvider {
           max_tokens: 1000
         }
       });
-
-      // Call the Perplexity API
-      const response = await fetch(apiEndpoint, {
+      
+      // Make the external API call using the Electron bridge
+      // This bypasses Content Security Policy restrictions by using the main process
+      const response = await window.electronAPI.externalApi.call({
+        url: apiEndpoint,
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: options.model,
-          messages,
-          temperature: options.temperature ?? 0.2,
-          max_tokens: 1000
-        })
+        body: requestBody
       });
       
-      // Log the full response details for debugging
-      console.log(`Perplexity API Response Status: ${response.status} ${response.statusText}`);
+      console.log('Received API response status:', response.status);
       
-      // Get the response headers as an object
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-      console.log('Perplexity API Response Headers:', responseHeaders);
-      
-      // Clone the response to read the body twice - once for logging, once for processing
-      const responseClone = response.clone();
-      let responseText = '';
-      try {
-        responseText = await responseClone.text();
-        console.log('Perplexity API Response Body (first 500 chars):', responseText.substring(0, 500));
-      } catch (e) {
-        console.warn('Error reading response text:', e);
-      }
-
       // Check if the response was successful
       if (!response.ok) {
-        throw new Error(`Perplexity API error: ${responseText || response.statusText}`);
+        throw new Error(`Perplexity API error: ${response.statusText || response.error || 'Unknown error'}`);
       }
-
-      // Parse the JSON response
-      const responseData = await response.json();
+      
+      // Extract the response data
+      const responseData = response.data;
+      
+      // If no data is returned, throw an error
+      if (!responseData) {
+        throw new Error('No data returned from Perplexity API');
+      }
       
       // Extract the response content based on the output type
       switch (options.outputType) {

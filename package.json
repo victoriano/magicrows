@@ -19,11 +19,13 @@
   "license": "MIT",
   "dependencies": {
     "@reduxjs/toolkit": "^2.0.1",
+    "@types/node-fetch": "^2.6.12",
     "axios": "^1.6.2",
     "daisyui": "^4.8.0",
     "electron-squirrel-startup": "^1.0.0",
     "electron-store": "^9.0.0",
     "js-yaml": "^4.1.0",
+    "node-fetch": "^3.3.2",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

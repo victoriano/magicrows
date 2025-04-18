@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './store';
+import { resetEnrichmentState } from './store/slices/aiEnrichmentSlice';
 import './styles/index.css';
 import App from './App';
 
@@ -14,6 +15,9 @@ const log = (message: string, ...args: any[]) => {
   const timestamp = new Date().toISOString().split('T')[1].substring(0, 8);
   console.log(`[${timestamp}] ${message}`, ...args);
 };
+
+// Reset transient states on app start
+store.dispatch(resetEnrichmentState());
 
 // Application initialization
 log('🚀 Index.tsx is executing');
@@ -80,4 +84,4 @@ try {
   }
 } catch (error) {
   console.error('❌ Fatal error during app initialization:', error);
-} 
+}

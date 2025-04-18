@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { REHYDRATE } from 'redux-persist';
 import { AIEnrichmentBlockConfig } from '../../../shared/schemas/AIEnrichmentBlockSchema';
 import { AIEnrichmentProcessor, EnrichmentProcessingResult } from '../../services/ai/AIEnrichmentProcessor';
 import { RootState } from '../index';
@@ -22,6 +23,7 @@ export interface AIEnrichmentState {
   status: EnrichmentStatus;
   error: string | null;
   result: EnrichmentProcessingResult | null;
+  _initialized?: boolean; // Track if state has been properly initialized
 }
 
 // Initial state
@@ -110,7 +112,8 @@ const initialState: AIEnrichmentState = {
   activeDataset: 'original',
   status: 'idle',
   error: null,
-  result: null
+  result: null,
+  _initialized: false
 };
 
 // Create async thunk for processing data with AI enrichment
@@ -188,10 +191,20 @@ const aiEnrichmentSlice = createSlice({
     },
     
     resetEnrichmentState: (state) => {
+      // Force-reset all processing-related state
       state.status = 'idle';
       state.error = null;
       state.result = null;
       state.activeDataset = 'original';
+      state._initialized = true;
+      
+      // If there was any selected preset, keep the selection but clear any runtime data
+      if (state.selectedPresetId) {
+        // We keep the selection for user convenience, but reset any processing state
+        console.log('Resetting AI enrichment state but preserving preset selection');
+      } else {
+        console.log('Resetting AI enrichment state completely');
+      }
     },
     
     addPreset: (state, action: PayloadAction<EnrichmentPreset>) => {
@@ -213,20 +226,31 @@ const aiEnrichmentSlice = createSlice({
     }
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(processDataWithAI.pending, (state) => {
-        state.status = 'processing';
+    // Handle rehydration explicitly to reset any processing state
+    builder.addCase(REHYDRATE, (state, action: any) => {
+      // This ensures we reset processing state on application restart
+      if (action.key === 'root' || action.key === 'aiEnrichment') {
+        console.log('Rehydration detected: Explicitly resetting AI processing state');
+        state.status = 'idle';
         state.error = null;
-      })
-      .addCase(processDataWithAI.fulfilled, (state, action) => {
-        state.status = 'success';
-        state.result = action.payload;
-        state.activeDataset = 'enriched';
-      })
-      .addCase(processDataWithAI.rejected, (state, action) => {
-        state.status = 'error';
-        state.error = action.payload as string;
-      });
+        state.result = null;
+        state._initialized = true;
+      }
+    });
+
+    builder.addCase(processDataWithAI.pending, (state) => {
+      state.status = 'processing';
+      state.error = null;
+    })
+    .addCase(processDataWithAI.fulfilled, (state, action) => {
+      state.status = 'success';
+      state.result = action.payload;
+      state.activeDataset = 'enriched';
+    })
+    .addCase(processDataWithAI.rejected, (state, action) => {
+      state.status = 'error';
+      state.error = action.payload as string;
+    });
   }
 });
 

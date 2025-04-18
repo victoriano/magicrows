@@ -1,5 +1,13 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import fetch from 'node-fetch';
+
+// Add type declaration for import.meta.env
+declare global {
+  interface ImportMeta {
+    env: Record<string, any>;
+  }
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -36,10 +44,104 @@ const createWindow = (): void => {
   }
 };
 
+// Register IPC handlers
+function registerIpcHandlers() {
+  console.log('Registering IPC handlers, including external-api:call');
+  
+  // Handle external API calls from the renderer process
+  ipcMain.handle('external-api:call', async (event, args) => {
+    const { url, method, headers, body } = args;
+    
+    console.log(`[Main Process] Making external API call to: ${url}`);
+    console.log(`[Main Process] Method: ${method}`);
+    
+    try {
+      // Make the API call using node-fetch
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+      });
+      
+      // Get response as text first
+      const responseText = await response.text();
+      
+      // Try to parse as JSON if possible
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        responseData = responseText;
+      }
+      
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        data: responseData
+      };
+    } catch (error) {
+      console.error('[Main Process] External API call error:', error);
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+
+  // File dialog handlers
+  ipcMain.handle('dialog:openFile', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'CSV Files', extensions: ['csv'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (canceled) {
+      return null;
+    } else {
+      return filePaths[0];
+    }
+  });
+
+  ipcMain.handle('dialog:saveFile', async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      filters: [
+        { name: 'CSV Files', extensions: ['csv'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (canceled) {
+      return null;
+    } else {
+      return filePath;
+    }
+  });
+
+  ipcMain.handle('dialog:selectDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+    });
+    if (canceled) {
+      return null;
+    } else {
+      return filePaths[0];
+    }
+  });
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', () => {
+  // Register IPC handlers first, before creating the window
+  registerIpcHandlers();
+  
+  // Then create the browser window
+  createWindow();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -57,33 +159,3 @@ app.on('activate', () => {
     createWindow();
   }
 });
-
-// File dialog handlers
-ipcMain.handle('dialog:openFile', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: 'CSV Files', extensions: ['csv'] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
-  });
-  if (canceled) {
-    return null;
-  } else {
-    return filePaths[0];
-  }
-});
-
-ipcMain.handle('dialog:saveFile', async () => {
-  const { canceled, filePath } = await dialog.showSaveDialog({
-    filters: [
-      { name: 'CSV Files', extensions: ['csv'] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
-  });
-  if (canceled) {
-    return null;
-  } else {
-    return filePath;
-  }
-}); 

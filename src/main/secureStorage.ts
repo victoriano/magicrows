@@ -342,8 +342,6 @@ function setupIpcHandlers() {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
       
-      console.log(`SECURE STORAGE: Getting API key for provider: ${providerId}`);
-      
       // Try different key formats
       const possibleKeys = [
         providerId,
@@ -364,13 +362,12 @@ function setupIpcHandlers() {
       for (const keyFormat of possibleKeys) {
         const key = secureStore.get(keyFormat) as string | undefined;
         if (key) {
-          console.log(`SECURE STORAGE: Found API key for ${providerId} using format: ${keyFormat}`);
-          console.log(`SECURE STORAGE: Key length: ${key.length} characters`);
+          // Found key, return it without logging
           return key;
         }
       }
       
-      console.error(`SECURE STORAGE: No API key found for ${providerId} after trying formats:`, possibleKeys);
+      // Only log errors, not normal operations
       return '';
     } catch (error) {
       console.error('Error getting API key:', error);
@@ -382,9 +379,6 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:set-api-key', (_, providerId: string, apiKey: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      
-      console.log(`SECURE STORAGE: Setting API key for provider: ${providerId}`);
-      console.log(`SECURE STORAGE: Key length: ${apiKey.length} characters`);
       
       // Store directly by providerId and also with apiKeys. prefix for compatibility
       const success1 = secureStore.set(providerId, apiKey);
@@ -408,8 +402,6 @@ function setupIpcHandlers() {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
       
-      console.log(`SECURE STORAGE: Deleting API key for provider: ${providerId}`);
-      
       // Delete both direct and prefixed versions
       const success1 = secureStore.delete(providerId);
       const success2 = secureStore.delete(`apiKeys.${providerId}`);
@@ -425,8 +417,6 @@ function setupIpcHandlers() {
   ipcMain.handle('secure-storage:has-api-key', (_, providerId: string) => {
     try {
       if (!secureStore) throw new Error('Secure storage not initialized');
-      
-      console.log(`SECURE STORAGE: Checking if API key exists for provider: ${providerId}`);
       
       // Try different key formats
       const possibleKeys = [
@@ -447,15 +437,15 @@ function setupIpcHandlers() {
       // Check all possible key formats
       for (const keyFormat of possibleKeys) {
         if (secureStore.has(keyFormat)) {
-          console.log(`SECURE STORAGE: Found API key for ${providerId} using format: ${keyFormat}`);
+          // Found a key - return true without logging
           return true;
         }
       }
       
-      console.log(`SECURE STORAGE: No API key found for ${providerId}`);
+      // No key found
       return false;
     } catch (error) {
-      console.error('Error checking API key:', error);
+      console.error('Error checking for API key:', error);
       return false;
     }
   });

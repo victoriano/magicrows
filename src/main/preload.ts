@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
+// Import the ElectronAPI interface from the types file
+import type { ElectronAPI } from '../renderer/types/electron';
 
 // Suppress dragEvent not defined errors - this is an Electron quirk
 window.addEventListener('error', (event) => {
@@ -29,27 +31,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteApiKey: (providerId: string) => ipcRenderer.invoke('secure-storage:delete-api-key', providerId),
     hasApiKey: (providerId: string) => ipcRenderer.invoke('secure-storage:has-api-key', providerId),
   },
-});
+  
+  // External API calls (to bypass content security policy restrictions)
+  externalApi: {
+    call: (options: { 
+      url: string; 
+      method: string; 
+      headers?: Record<string, string>; 
+      body?: any; 
+    }) => ipcRenderer.invoke('external-api:call', options),
+  },
+} as ElectronAPI);
 
-// TypeScript declarations for window.electronAPI
-declare global {
-  interface Window {
-    electronAPI: {
-      openFile: () => Promise<string | null>;
-      saveFile: () => Promise<string | null>;
-      selectDirectory: () => Promise<string | null>;
-      readFile: (path: string) => Promise<string>;
-      writeFile: (path: string, content: string) => Promise<boolean>;
-      getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
-      saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<boolean>;
-      restart: () => Promise<void>;
-      getAppInfo: () => Promise<{ version: string, platform: string }>;
-      secureStorage: {
-        getApiKey: (providerId: string) => Promise<string>;
-        setApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
-        deleteApiKey: (providerId: string) => Promise<boolean>;
-        hasApiKey: (providerId: string) => Promise<boolean>;
-      };
-    }
-  }
-}
+// The window.electronAPI interface is defined in ../renderer/types/electron.d.ts

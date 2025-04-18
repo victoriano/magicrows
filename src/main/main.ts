@@ -351,6 +351,52 @@ ipcMain.handle('config:saveApiKeys', (_, keys) => {
   return;
 });
 
+// External API handler for making external requests from the renderer process
+// This bypasses Content Security Policy restrictions
+ipcMain.handle('external-api:call', async (_, args) => {
+  const { url, method, headers, body } = args;
+  
+  console.log(`[Main Process] Making external API call to: ${url}`);
+  console.log(`[Main Process] Method: ${method}`);
+  
+  try {
+    // We need to import fetch dynamically since it's not imported at the top level
+    const fetch = (await import('node-fetch')).default;
+    
+    // Make the API call using node-fetch
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    // Get response as text first
+    const responseText = await response.text();
+    
+    // Try to parse as JSON if possible
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      responseData = responseText;
+    }
+    
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      data: responseData
+    };
+  } catch (error) {
+    console.error('[Main Process] External API call error:', error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
 // Initialize the app and create window
 const initApp = async () => {
   try {

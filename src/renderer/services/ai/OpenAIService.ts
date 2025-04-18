@@ -77,13 +77,29 @@ export class OpenAIService extends BaseAIProvider {
       // Prepare the request body - exactly like the working curl command
       const requestBody = JSON.stringify({
         model: options.model,
-        messages: messages,
+        messages,
         temperature: options.temperature || 0.2,
         max_tokens: 1000,
         n: 1,
         stream: false
       });
+
+      // Log detailed request information for debugging
+      console.log('OpenAI API Request Body:', JSON.stringify({
+        model: options.model,
+        messages: messages.map(m => ({ 
+          role: m.role, 
+          content: m.content.length > 20 ? m.content.substring(0, 20) + '...' : m.content 
+        })),
+        temperature: options.temperature || 0.2,
+        max_tokens: 1000,
+        n: 1,
+        stream: false
+      }, null, 2));
       
+      // Log the full messages for debugging
+      console.log('OpenAI Messages Content:', JSON.stringify(messages, null, 2));
+
       // Log the request details (with sensitive info masked)
       console.log('OpenAI API Request:', {
         url: apiEndpoint,

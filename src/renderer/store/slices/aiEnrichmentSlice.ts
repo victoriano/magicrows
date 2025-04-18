@@ -92,16 +92,16 @@ const initialState: AIEnrichmentState = {
         mode: 'preview',
         previewRowCount: 2,
         outputFormat: 'newRows',
-        contextColumns: ['name', 'description'],
+        contextColumns: ['nace', 'isco'],
         outputs: [
           {
-            name: 'Additional Details',
-            prompt: 'Based on this product information, generate additional details that might be helpful for customers. Product name: {{name}}, Description: {{description}}',
+            name: 'Startup Ideas',
+            prompt: 'For this sector and occupation: {{nace}} {{isco}} disrupting using new genAI capabilities',
             outputType: 'text'
           },
           {
-            name: 'Related Product',
-            prompt: 'Suggest a possible related product to {{name}} with this description: {{description}}',
+            name: 'Example of Startup',
+            prompt: 'For this sector and occupation: {{nace}} {{isco}} list disrupting startups using AI already to serve problems',
             outputType: 'text'
           }
         ]
@@ -126,8 +126,10 @@ export const processDataWithAI = createAsyncThunk<
   async (overrideConfig, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const { selectedPresetId, presets } = state.aiEnrichment;
-      const { csvData } = state.data;
+      const aiEnrichment = state.aiEnrichment || { selectedPresetId: null, presets: [] };
+      const selectedPresetId = aiEnrichment.selectedPresetId;
+      const presets = aiEnrichment.presets || [];
+      const csvData = state.data?.csvData;
       
       // Validate requirements
       if (!selectedPresetId && !overrideConfig) {
@@ -266,17 +268,18 @@ export const {
 } = aiEnrichmentSlice.actions;
 
 // Export selectors
-export const selectAIEnrichmentState = (state: RootState) => state.aiEnrichment;
-export const selectPresets = (state: RootState) => state.aiEnrichment.presets;
+export const selectAIEnrichmentState = (state: RootState) => state.aiEnrichment || initialState;
+export const selectPresets = (state: RootState) => state.aiEnrichment?.presets || initialState.presets;
 export const selectSelectedPreset = (state: RootState) => {
-  const { selectedPresetId, presets } = state.aiEnrichment;
+  const aiEnrichment = state.aiEnrichment || { selectedPresetId: null, presets: [] };
+  const { selectedPresetId, presets } = aiEnrichment;
   if (!selectedPresetId) return null;
   return presets.find(preset => preset.id === selectedPresetId) || null;
 };
-export const selectEnrichmentStatus = (state: RootState) => state.aiEnrichment.status;
-export const selectActiveDataset = (state: RootState) => state.aiEnrichment.activeDataset;
-export const selectEnrichmentResult = (state: RootState) => state.aiEnrichment.result;
-export const selectEnrichmentError = (state: RootState) => state.aiEnrichment.error;
+export const selectEnrichmentStatus = (state: RootState) => state.aiEnrichment?.status || 'idle';
+export const selectActiveDataset = (state: RootState) => state.aiEnrichment?.activeDataset || 'original';
+export const selectEnrichmentResult = (state: RootState) => state.aiEnrichment?.result || null;
+export const selectEnrichmentError = (state: RootState) => state.aiEnrichment?.error || null;
 
 // Export reducer
 export default aiEnrichmentSlice.reducer;

@@ -19,7 +19,8 @@ const AIEnrichmentSelector: React.FC = () => {
     error
   } = useAIEnrichment();
   
-  const { providers } = useSelector((state: RootState) => state.providers);
+  const providerState = useSelector((state: RootState) => state.providers || { providers: [] });
+  const { providers = [] } = providerState;
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);

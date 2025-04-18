@@ -119,6 +119,10 @@ export class PerplexityService extends BaseAIProvider {
         }
       });
       
+      // Log the full request body for debugging
+      console.log('Perplexity API Request Body:', JSON.stringify(requestBody, null, 2));
+      console.log('Perplexity Messages Content:', JSON.stringify(messages, null, 2));
+      
       try {
         // Make the external API call using the Electron bridge
         // This bypasses Content Security Policy restrictions by using the main process
@@ -131,6 +135,9 @@ export class PerplexityService extends BaseAIProvider {
         });
         
         console.log('Received API response status:', response.status);
+        
+        // Add detailed logging of the full response
+        console.log('Perplexity API Response Data:', JSON.stringify(response.data, null, 2));
         
         // Check if the response was successful
         if (!response.ok) {

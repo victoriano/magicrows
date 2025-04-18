@@ -26,7 +26,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
   providerType,
   isLoading = false
 }) => {
-  const { providers, isLoading: providersLoading } = useSelector((state: RootState) => state.providers);
+  // Add default values for potentially undefined state properties
+  const providerState = useSelector((state: RootState) => state.providers || { providers: [], isLoading: false });
+  const { providers = [], isLoading: providersLoading = false } = providerState;
   const [showDropdown, setShowDropdown] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({});
 

@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
+import React, { useState, useLayoutEffect, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   addProvider, 
@@ -75,6 +75,25 @@ const App: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data);
   const providers = useSelector((state: RootState) => state.providers.providers);
+  const aiEnrichment = useSelector((state: RootState) => state.aiEnrichment);
+  
+  // Memoize the data display selection based on the enrichment state
+  const { displayHeaders, displayRows } = useMemo(() => {
+    const isShowingEnriched = aiEnrichment?.activeDataset === 'enriched' && !!aiEnrichment?.result;
+    
+    const headers = isShowingEnriched && aiEnrichment?.result?.newHeaders 
+      ? aiEnrichment.result.newHeaders 
+      : csvData?.headers || [];
+      
+    const rows = isShowingEnriched && aiEnrichment?.result?.newRows 
+      ? aiEnrichment.result.newRows 
+      : csvData?.rows || [];
+    
+    return {
+      displayHeaders: headers,
+      displayRows: rows
+    };
+  }, [csvData, aiEnrichment]);
   
   // Debug provider persistence on app init and when providers change
   useEffect(() => {
@@ -819,13 +838,13 @@ const App: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead className="bg-base-200 text-left">
                       <tr>
-                        {csvData.headers.map((header, index) => (
+                        {displayHeaders.map((header, index) => (
                           <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {csvData.rows.slice(0, 10).map((row, rowIndex) => (
+                      {displayRows.map((row, rowIndex) => (
                         <tr key={rowIndex} className="hover:bg-base-200/30">
                           {row.map((cell, cellIndex) => (
                             <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
@@ -1027,13 +1046,15 @@ const App: React.FC = () => {
                     <table className="w-full text-sm">
                       <thead className="bg-base-200 text-left sticky top-0">
                         <tr>
-                          {csvData.headers.map((header, index) => (
+                          {/* Render headers based on active dataset */}
+                          {displayHeaders.map((header, index) => (
                             <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {csvData.rows.map((row, rowIndex) => (
+                        {/* Render rows based on active dataset */}
+                        {displayRows.map((row, rowIndex) => (
                           <tr key={rowIndex} className="hover:bg-base-200/30">
                             {row.map((cell, cellIndex) => (
                               <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>

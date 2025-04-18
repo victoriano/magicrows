@@ -8,14 +8,11 @@ import { AIModelResponse, BaseAIProvider, ProcessPromptOptions } from './AIProvi
 export class PerplexityService extends BaseAIProvider {
   // Valid Perplexity models for enrichment tasks
   private static readonly SUPPORTED_MODELS = [
-    'llama-3-sonar-small-32k-online',
-    'llama-3-sonar-small-32k',
-    'llama-3-sonar-large-32k', 
-    'sonar-small-online',
-    'sonar-small-chat',
-    'sonar-medium-online',
-    'sonar-medium-chat',
-    'mistral-7b-instruct'
+    'sonar',
+    'sonar-pro',
+    'sonar-reasoning',
+    'sonar-reasoning-pro',
+    'sonar-deep-research'
   ];
 
   /**
@@ -91,12 +88,17 @@ export class PerplexityService extends BaseAIProvider {
       
       console.log(`Using Perplexity API endpoint: ${apiEndpoint}`);
 
-      // Create the request body
+      // Create the request body according to Perplexity API specifications
+      // https://docs.perplexity.ai/api-reference/chat-completions
       const requestBody = {
-        model: options.model,
+        model: options.model || 'sonar', // Default to sonar if not specified
         messages,
         temperature: options.temperature ?? 0.2,
-        max_tokens: 1000
+        max_tokens: 1000,
+        top_p: 0.9,
+        stream: false,
+        presence_penalty: 0,
+        frequency_penalty: 0
       };
 
       // Log the request details (excluding sensitive info)
@@ -109,55 +111,70 @@ export class PerplexityService extends BaseAIProvider {
           'Authorization': 'Bearer pplx-...' // Masked for security
         },
         body: {
-          model: options.model,
+          model: requestBody.model,
           messages: messages.map(m => ({ role: m.role, content: m.content.substring(0, 20) + '...' })),
-          temperature: options.temperature ?? 0.2,
-          max_tokens: 1000
+          temperature: requestBody.temperature,
+          max_tokens: requestBody.max_tokens,
+          top_p: requestBody.top_p
         }
       });
       
-      // Make the external API call using the Electron bridge
-      // This bypasses Content Security Policy restrictions by using the main process
-      const response = await window.electronAPI.externalApi.call({
-        url: apiEndpoint,
-        method: 'POST',
-        headers,
-        body: requestBody
-      });
-      
-      console.log('Received API response status:', response.status);
-      
-      // Check if the response was successful
-      if (!response.ok) {
-        throw new Error(`Perplexity API error: ${response.statusText || response.error || 'Unknown error'}`);
-      }
-      
-      // Extract the response data
-      const responseData = response.data;
-      
-      // If no data is returned, throw an error
-      if (!responseData) {
-        throw new Error('No data returned from Perplexity API');
-      }
-      
-      // Extract the response content based on the output type
-      switch (options.outputType) {
-        case 'text':
-          return {
-            text: responseData.choices?.[0]?.message?.content || '',
-            error: undefined
-          };
-        case 'categories':
-          return this.processCategoriesResponse(responseData, options);
-        case 'singleCategory':
-          return this.processSingleCategoryResponse(responseData, options);
-        case 'number':
-          return this.processNumberResponse(responseData);
-        default:
-          return {
-            text: responseData.choices?.[0]?.message?.content || '',
-            error: undefined
-          };
+      try {
+        // Make the external API call using the Electron bridge
+        // This bypasses Content Security Policy restrictions by using the main process
+        // @ts-ignore - The TypeScript definition doesn't match the actual implementation
+        const response = await window.electronAPI.externalApi.call({
+          url: apiEndpoint,
+          method: 'POST',
+          headers,
+          body: requestBody
+        });
+        
+        console.log('Received API response status:', response.status);
+        
+        // Check if the response was successful
+        if (!response.ok) {
+          // Try to extract more detailed error information
+          let errorMessage = response.statusText || response.error || 'Unknown error';
+          if (response.data && typeof response.data === 'object') {
+            errorMessage = JSON.stringify(response.data);
+          }
+          throw new Error(`Perplexity API error: ${errorMessage}`);
+        }
+        
+        // Extract the response data
+        const responseData = response.data;
+        
+        // Validate the response structure
+        if (!responseData || !responseData.choices || !responseData.choices[0]) {
+          throw new Error('Invalid response from Perplexity API: Missing choices');
+        }
+        
+        // Extract the response content based on the output type
+        switch (options.outputType) {
+          case 'text':
+            return {
+              text: responseData.choices?.[0]?.message?.content || '',
+              error: undefined
+            };
+          case 'categories':
+            return this.processCategoriesResponse(responseData, options);
+          case 'singleCategory':
+            return this.processSingleCategoryResponse(responseData, options);
+          case 'number':
+            return this.processNumberResponse(responseData);
+          default:
+            return {
+              text: responseData.choices?.[0]?.message?.content || '',
+              error: undefined
+            };
+        }
+      } catch (error) {
+        console.error('Error processing prompt with Perplexity:', error);
+        return {
+          text: undefined,
+          error: error instanceof Error ? error.message : String(error)
+        };
       }
     } catch (error) {
       console.error('Error processing prompt with Perplexity:', error);

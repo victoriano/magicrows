@@ -354,24 +354,53 @@ ipcMain.handle('config:saveApiKeys', (_, keys) => {
 // External API handler for making external requests from the renderer process
 // This bypasses Content Security Policy restrictions
 ipcMain.handle('external-api:call', async (_, args) => {
-  const { url, method, headers, body } = args;
+  const { url, method, headers, body, timeout = 30000 } = args;
   
   console.log(`[Main Process] Making external API call to: ${url}`);
   console.log(`[Main Process] Method: ${method}`);
   
+  if (url.includes('perplexity')) {
+    console.log(`[Main Process] Perplexity API call detected`);
+    console.log(`[Main Process] Headers: ${JSON.stringify(headers, null, 2)}`);
+    console.log(`[Main Process] Body: ${JSON.stringify(body, null, 2)}`);
+  }
+  
   try {
     // We need to import fetch dynamically since it's not imported at the top level
-    const fetch = (await import('node-fetch')).default;
+    const { default: fetch } = await import('node-fetch');
+    const https = await import('https');
+    
+    // Create abort controller for timeout
+    // Use native AbortController from global scope
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    // Set family: 4 to force IPv4 (avoid IPv6 issues)
+    const agent = new https.Agent({
+      family: 4, // Force IPv4
+      timeout: timeout
+    });
     
     // Make the API call using node-fetch
     const response = await fetch(url, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+      agent
+      // timeout property removed as it's not in the RequestInit type
     });
+    
+    // Clear the timeout
+    clearTimeout(timeoutId);
     
     // Get response as text first
     const responseText = await response.text();
+    
+    if (url.includes('perplexity')) {
+      console.log(`[Main Process] Perplexity API response status: ${response.status}`);
+      console.log(`[Main Process] Perplexity API response text: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`);
+    }
     
     // Try to parse as JSON if possible
     let responseData;
@@ -390,10 +419,20 @@ ipcMain.handle('external-api:call', async (_, args) => {
     };
   } catch (error) {
     console.error('[Main Process] External API call error:', error);
-    return {
+    
+    // Enhanced error information
+    const errorInfo = {
       ok: false,
-      error: error instanceof Error ? error.message : String(error)
+      status: error.name === 'AbortError' ? 408 : undefined,
+      statusText: error.name === 'AbortError' ? 'Request Timeout' : undefined,
+      error: error instanceof Error ? error.message : String(error),
+      code: error.code,
+      name: error.name,
+      isTimeout: error.name === 'AbortError' || error.code === 'ETIMEDOUT'
     };
+    
+    console.log('[Main Process] Detailed error info:', errorInfo);
+    return errorInfo;
   }
 });
 

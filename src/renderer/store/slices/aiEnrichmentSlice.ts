@@ -88,7 +88,7 @@ const initialState: AIEnrichmentState = {
       description: 'Generate additional insights and details from existing data',
       config: {
         integrationName: 'perplexity',
-        model: 'sonar-small-online',
+        model: 'sonar',
         mode: 'preview',
         previewRowCount: 2,
         outputFormat: 'newRows',

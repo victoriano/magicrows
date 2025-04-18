@@ -11,7 +11,7 @@ import {
   checkProviderApiKey,
   getProviderApiKey
 } from './store/slices/providerSlice';
-import { RootState, AppDispatch } from './store';
+import { RootState, AppDispatch, persistor } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import Papa from 'papaparse';
 // Import AI Enrichment components
@@ -612,6 +612,33 @@ const App: React.FC = () => {
     }
   };
 
+  // Function to reset the application state
+  const handleResetState = async () => {
+    // Show confirmation dialog
+    const confirmReset = window.confirm(
+      "This will reset all application state including saved presets and configurations. The application will restart after reset. Continue?"
+    );
+
+    if (confirmReset) {
+      try {
+        // First purge the Redux persisted state
+        await persistor.purge();
+        console.log("Application state has been reset");
+        
+        // Restart the application to apply changes
+        if (window.electronAPI && window.electronAPI.restart) {
+          await window.electronAPI.restart();
+        } else {
+          // If restart API is not available, reload the page
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error("Error resetting application state:", error);
+        alert("Failed to reset application state. See console for details.");
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
@@ -946,6 +973,18 @@ const App: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       <input type="checkbox" className="checkbox" />
                       <span className="text-sm">Save results automatically</span>
+                    </div>
+                    <div className="border-t border-gray-200 pt-4 mt-2">
+                      <h4 className="text-sm font-medium mb-2">Maintenance</h4>
+                      <button 
+                        onClick={handleResetState}
+                        className="btn btn-error btn-sm w-full"
+                      >
+                        Reset Application State
+                      </button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Resets all saved settings and configurations. Use this if you experience issues with outdated model configurations.
+                      </p>
                     </div>
                   </div>
                 </div>

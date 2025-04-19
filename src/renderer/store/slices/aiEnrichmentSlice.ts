@@ -3,6 +3,7 @@ import { REHYDRATE } from 'redux-persist';
 import { AIEnrichmentBlockConfig } from '../../../shared/schemas/AIEnrichmentBlockSchema';
 import { AIEnrichmentProcessor, EnrichmentProcessingResult } from '../../services/ai/AIEnrichmentProcessor';
 import { RootState } from '../index';
+import { PresetLoaderService } from '../../services/presets/PresetLoaderService';
 
 // Define the structure of a preset enrichment configuration
 export interface EnrichmentPreset {
@@ -28,86 +29,7 @@ export interface AIEnrichmentState {
 
 // Initial state
 const initialState: AIEnrichmentState = {
-  presets: [
-    {
-      id: 'sentiment-analysis',
-      name: 'Sentiment Analysis',
-      description: 'Analyze text sentiment and categorize as positive, negative, or neutral',
-      config: {
-        integrationName: 'openai',
-        model: 'gpt-3.5-turbo',
-        mode: 'preview',
-        previewRowCount: 2,
-        outputFormat: 'newColumns',
-        outputs: [
-          {
-            name: 'Sentiment',
-            prompt: 'Analyze the sentiment of the following text and respond with exactly one of: "positive", "negative", or "neutral". Text: {{description}}',
-            outputType: 'singleCategory',
-            outputCategories: [
-              { name: 'positive', description: 'Text has overall positive sentiment' },
-              { name: 'negative', description: 'Text has overall negative sentiment' },
-              { name: 'neutral', description: 'Text has neutral or mixed sentiment' }
-            ]
-          },
-          {
-            name: 'Sentiment Score',
-            prompt: 'On a scale from 1 to 10, where 1 is extremely negative and 10 is extremely positive, rate the sentiment of the following text. Respond with just the number. Text: {{description}}',
-            outputType: 'number'
-          }
-        ]
-      }
-    },
-    {
-      id: 'keyword-extraction',
-      name: 'Keyword Extraction',
-      description: 'Extract key topics and entities from text',
-      config: {
-        integrationName: 'openai',
-        model: 'gpt-3.5-turbo',
-        mode: 'preview',
-        previewRowCount: 2,
-        outputFormat: 'newColumns',
-        outputs: [
-          {
-            name: 'Keywords',
-            prompt: 'Extract the most important keywords from this text. Respond with up to 5 keywords separated by commas: {{description}}',
-            outputType: 'categories'
-          },
-          {
-            name: 'Main Topic',
-            prompt: 'What is the main topic of this text? Respond with a single word or short phrase: {{description}}',
-            outputType: 'text'
-          }
-        ]
-      }
-    },
-    {
-      id: 'data-enrichment',
-      name: 'Data Enrichment',
-      description: 'Generate additional insights and details from existing data',
-      config: {
-        integrationName: 'perplexity',
-        model: 'sonar',
-        mode: 'preview',
-        previewRowCount: 2,
-        outputFormat: 'newRows',
-        contextColumns: ['nace', 'isco'],
-        outputs: [
-          {
-            name: 'Startup Ideas',
-            prompt: 'For this sector and occupation: {{nace}} {{isco}} disrupting using new genAI capabilities',
-            outputType: 'text'
-          },
-          {
-            name: 'Example of Startup',
-            prompt: 'For this sector and occupation: {{nace}} {{isco}} list disrupting startups using AI already to serve problems',
-            outputType: 'text'
-          }
-        ]
-      }
-    }
-  ],
+  presets: [], // We'll load presets from the PresetLoaderService
   selectedPresetId: null,
   activeDataset: 'original',
   status: 'idle',
@@ -115,6 +37,28 @@ const initialState: AIEnrichmentState = {
   result: null,
   _initialized: false
 };
+
+// Create an async thunk to load presets from the PresetLoaderService
+export const loadExternalPresets = createAsyncThunk<
+  EnrichmentPreset[],
+  void,
+  { state: RootState }
+>(
+  'aiEnrichment/loadExternalPresets',
+  async (_, { rejectWithValue }) => {
+    try {
+      // Get the singleton instance of PresetLoaderService
+      const presetService = PresetLoaderService.getInstance();
+      
+      // Load all presets
+      const presets = await presetService.loadAllPresets();
+      
+      return presets;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to load presets');
+    }
+  }
+);
 
 // Create async thunk for processing data with AI enrichment
 export const processDataWithAI = createAsyncThunk<
@@ -228,31 +172,42 @@ const aiEnrichmentSlice = createSlice({
     }
   },
   extraReducers: (builder) => {
-    // Handle rehydration explicitly to reset any processing state
-    builder.addCase(REHYDRATE, (state, action: any) => {
-      // This ensures we reset processing state on application restart
-      if (action.key === 'root' || action.key === 'aiEnrichment') {
-        console.log('Rehydration detected: Explicitly resetting AI processing state');
-        state.status = 'idle';
-        state.error = null;
-        state.result = null;
+    // Add extra reducers for async thunks
+    builder
+      // Handle rehydration from redux-persist
+      .addCase(REHYDRATE, (state) => {
         state._initialized = true;
-      }
-    });
-
-    builder.addCase(processDataWithAI.pending, (state) => {
-      state.status = 'processing';
-      state.error = null;
-    })
-    .addCase(processDataWithAI.fulfilled, (state, action) => {
-      state.status = 'success';
-      state.result = action.payload;
-      state.activeDataset = 'enriched';
-    })
-    .addCase(processDataWithAI.rejected, (state, action) => {
-      state.status = 'error';
-      state.error = action.payload as string;
-    });
+      })
+      
+      // Handle loadExternalPresets async thunk
+      .addCase(loadExternalPresets.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(loadExternalPresets.fulfilled, (state, action) => {
+        state.presets = action.payload;
+        state._initialized = true;
+      })
+      .addCase(loadExternalPresets.rejected, (state, action) => {
+        console.error('Failed to load presets:', action.payload);
+        // Keep any existing presets on error
+        state.error = action.payload as string;
+        state._initialized = true;
+      })
+      
+      // Handle processDataWithAI async thunk
+      .addCase(processDataWithAI.pending, (state) => {
+        state.status = 'processing';
+        state.error = null;
+      })
+      .addCase(processDataWithAI.fulfilled, (state, action) => {
+        state.status = 'success';
+        state.result = action.payload;
+        state.activeDataset = 'enriched'; // Switch to the enriched dataset view
+      })
+      .addCase(processDataWithAI.rejected, (state, action) => {
+        state.status = 'error';
+        state.error = action.payload as string;
+      });
   }
 });
 
@@ -268,18 +223,18 @@ export const {
 } = aiEnrichmentSlice.actions;
 
 // Export selectors
-export const selectAIEnrichmentState = (state: RootState) => state.aiEnrichment || initialState;
-export const selectPresets = (state: RootState) => state.aiEnrichment?.presets || initialState.presets;
+export const selectAIEnrichmentState = (state: RootState) => state.aiEnrichment;
+export const selectPresets = (state: RootState) => state.aiEnrichment?.presets || [];
 export const selectSelectedPreset = (state: RootState) => {
-  const aiEnrichment = state.aiEnrichment || { selectedPresetId: null, presets: [] };
-  const { selectedPresetId, presets } = aiEnrichment;
-  if (!selectedPresetId) return null;
-  return presets.find(preset => preset.id === selectedPresetId) || null;
+  const aiEnrichment = state.aiEnrichment;
+  if (!aiEnrichment || !aiEnrichment.selectedPresetId) return null;
+  
+  return aiEnrichment.presets.find(preset => preset.id === aiEnrichment.selectedPresetId);
 };
-export const selectEnrichmentStatus = (state: RootState) => state.aiEnrichment?.status || 'idle';
-export const selectActiveDataset = (state: RootState) => state.aiEnrichment?.activeDataset || 'original';
-export const selectEnrichmentResult = (state: RootState) => state.aiEnrichment?.result || null;
-export const selectEnrichmentError = (state: RootState) => state.aiEnrichment?.error || null;
+export const selectEnrichmentStatus = (state: RootState) => state.aiEnrichment?.status;
+export const selectActiveDataset = (state: RootState) => state.aiEnrichment?.activeDataset;
+export const selectEnrichmentResult = (state: RootState) => state.aiEnrichment?.result;
+export const selectEnrichmentError = (state: RootState) => state.aiEnrichment?.error;
 
 // Export reducer
 export default aiEnrichmentSlice.reducer;

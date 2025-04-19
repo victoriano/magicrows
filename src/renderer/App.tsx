@@ -13,6 +13,7 @@ import {
 } from './store/slices/providerSlice';
 import { RootState, AppDispatch, persistor } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
+import { loadExternalPresets } from './store/slices/aiEnrichmentSlice';
 import Papa from 'papaparse';
 // Import AI Enrichment components
 import { AIEnrichmentSelector, DatasetSelector, ProcessingStatusIndicator } from './components/AIEnrichment';
@@ -109,6 +110,12 @@ const App: React.FC = () => {
   useEffect(() => {
     console.log('Recent files:', recentFiles);
   }, [recentFiles]);
+
+  // Load external presets when the app initializes
+  useEffect(() => {
+    console.log('Loading external presets from schemas_examples folder');
+    dispatch(loadExternalPresets());
+  }, [dispatch]);
 
   const addTestFile = () => {
     const testFile = {

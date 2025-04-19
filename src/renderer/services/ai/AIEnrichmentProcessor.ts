@@ -179,6 +179,20 @@ export class AIEnrichmentProcessor {
           outputCategories: outputConfig.outputCategories
         };
         
+        // Auto‑attach JSON schema for multiple outputs
+        if (outputConfig.outputCardinality === 'multiple') {
+          if (outputConfig.outputType === 'number') {
+            options.responseSchema = { type: 'array', items: { type: 'number' } };
+          } else if (outputConfig.outputType === 'category' && Array.isArray(outputConfig.outputCategories)) {
+            options.responseSchema = {
+              type: 'array',
+              items: { type: 'string', enum: outputConfig.outputCategories.map(cat => cat.name) }
+            };
+          } else {
+            options.responseSchema = { type: 'array', items: { type: 'string' } };
+          }
+        }
+        
         const response = await provider.processPrompt(prompt, options);
         
         outputs.push({

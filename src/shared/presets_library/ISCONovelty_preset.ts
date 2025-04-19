@@ -17,7 +17,8 @@ export const ISCONoveltyConfig: AIEnrichmentBlockConfig = {
     {
       "name": "novelty_rating",
       "prompt": "Based on the automation tasks identified for the profession with NACE code {{nace}} and ISCO code {{isco}}, evaluate how novel these automation opportunities are in the current market. Consider factors like existing solutions, unique applications, and market saturation. Select the most appropriate rating category.",
-      "outputType": "singleCategory",
+      "outputType": "category",
+      "outputCardinality": "single",
       "outputCategories": [
         {
           "name": "Very Novel",
@@ -44,7 +45,8 @@ export const ISCONoveltyConfig: AIEnrichmentBlockConfig = {
     {
       "name": "best_country_match",
       "prompt": "Based on the industry sector with NACE code {{nace}} and occupation with ISCO code {{isco}}, analyze which of the following European countries has the strongest and most advanced industry in this specific sector and occupation. Consider factors like technological advancement, market leadership, innovation, workforce expertise, and industry presence. Select the most appropriate country and reason base on specific companies names that are strong for that country in tha industry",
-      "outputType": "singleCategory",
+      "outputType": "category",
+      "outputCardinality": "single",
       "outputCategories": [
         {
           "name": "Germany",

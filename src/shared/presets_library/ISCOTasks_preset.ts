@@ -16,8 +16,9 @@ export const ISCOtasksConfig: AIEnrichmentBlockConfig = {
   "outputs": [
     {
       "name": "automation_tasks",
-      "prompt": "For the profession described by NACE code {{nace}} and ISCO code {{isco}}, identify 5 specific tasks currently performed that have high potential for automation using modern AI technologies (like LLMs, computer vision, etc.). Focus on tasks where AI could form the core of a potential startup idea. Please list only the tasks, one per line for a text output",
-      "outputType": "text"
+      "prompt": "For the profession described by NACE code {{nace}} and ISCO code {{isco}}, identify 5 specific tasks with high AI automation potential.",
+      "outputType": "text",
+      "outputCardinality": "multiple"
     }
   ]
 };
@@ -31,5 +32,3 @@ export const ISCOTasksPreset = {
   description: 'Identify tasks with high automation potential based on NACE and ISCO codes',
   config: ISCOtasksConfig
 };
-
-

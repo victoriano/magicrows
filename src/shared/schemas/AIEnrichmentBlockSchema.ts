@@ -74,11 +74,17 @@ export const AIEnrichmentBlockSchema = {
             "outputType": {
               "type": "string",
               "description": "The type of output expected from the LLM for this column",
-              "enum": ["categories", "singleCategory", "number", "url", "text", "date"]
+              "enum": ["category", "number", "url", "text", "date"]
+            },
+            "outputCardinality": {
+              "type": "string",
+              "enum": ["single", "multiple"],
+              "default": "single",
+              "description": "Expect a single value or an array of values"
             },
             "outputCategories": {
               "type": "array",
-              "description": "Structured output categories (required when outputType is 'categories' or 'singleCategory')",
+              "description": "Structured output categories (required when outputType is 'category')",
               "items": {
                 "type": "object",
                 "properties": {
@@ -120,8 +126,10 @@ export const AIEnrichmentBlockSchema = {
     /** Prompt text to send to the LLM */
     prompt: string;
     /** Type of expected output from the LLM */
-    outputType: "categories" | "singleCategory" | "number" | "url" | "text" | "date";
-    /** Categories for structured categorical outputs (required for categories/singleCategory types) */
+    outputType: "category" | "number" | "url" | "text" | "date";
+    /** Cardinality: single (default) or multiple values */
+    outputCardinality?: "single" | "multiple";
+    /** Categories for structured categorical outputs (required when outputType is 'category') */
     outputCategories?: OutputCategory[];
   }
   
@@ -154,7 +162,7 @@ export const AIEnrichmentBlockSchema = {
    */
   export function validateOutputCategories(config: AIEnrichmentBlockConfig): boolean {
     return config.outputs.every(output => {
-      if (output.outputType === "categories" || output.outputType === "singleCategory") {
+      if (output.outputType === "category") {
         return Array.isArray(output.outputCategories) && output.outputCategories.length > 0;
       }
       return true;

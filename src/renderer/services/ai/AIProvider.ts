@@ -29,6 +29,7 @@ export interface AIModelResponse {
   number?: number;
   url?: string;
   date?: string;
+  items?: string[]; // For multiple text items
   error?: string;
   structuredData?: any; // For structured JSON responses
   reasoning?: string; // For storing the reasoning behind decisions in structured outputs
@@ -42,6 +43,9 @@ export interface ProcessPromptOptions {
   temperature?: number;
   outputType: OutputConfig['outputType'];
   outputCategories?: OutputConfig['outputCategories'];
+  outputCardinality?: OutputConfig['outputCardinality'];
+  /** Optional JSON schema for structured output */
+  responseSchema?: any;
   providerOptions?: Record<string, any>;
 }
 

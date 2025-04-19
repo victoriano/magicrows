@@ -392,22 +392,53 @@ export class AIEnrichmentProcessor {
     originalRows: string[][],
     errors: { rowIndex: number; error: string }[]
   ): EnrichmentProcessingResult {
-    // For newRows format, we add a new column to identify the output
-    const newHeaders = [...originalHeaders, 'output_name', 'output_value'];
+    const newHeaders = [
+      ...originalHeaders,
+      'enrichment_output_field',
+      'enrichment_output_value'
+    ];
+    
+    // Add reasoning header when appropriate outputs exist
+    if (rowResults.some(result => 
+      result.outputs.some(output => 
+        output.response.reasoning !== undefined ||
+        (output.outputType === 'singleCategory' && output.response.category !== undefined)
+      )
+    )) {
+      newHeaders.push('enrichment_output_reasoning');
+    }
+    
     const newRows: string[][] = [];
     
-    // For each processed row and each output, create a new row
     rowResults.forEach(rowResult => {
       if (rowResult.error) return; // Skip rows with errors
       
       const originalRow = originalRows[rowResult.rowIndex];
       
       rowResult.outputs.forEach(output => {
-        newRows.push([
+        const newRow = [
           ...originalRow,
           output.outputName,
           this.formatOutputValue(output.response)
-        ]);
+        ];
+        
+        // Add reasoning as a separate column if it exists or for singleCategory outputs
+        if (newHeaders.includes('enrichment_output_reasoning')) {
+          // Use the reasoning field if it exists
+          if (output.response.reasoning !== undefined) {
+            newRow.push(output.response.reasoning);
+          } 
+          // If no reasoning but this is a category output, add an empty cell
+          else if (output.outputType === 'singleCategory' && output.response.category !== undefined) {
+            newRow.push('');
+          } 
+          // Otherwise leave it empty
+          else {
+            newRow.push('');
+          }
+        }
+        
+        newRows.push(newRow);
       });
     });
     
@@ -429,30 +460,52 @@ export class AIEnrichmentProcessor {
       return `Error: ${response.error}`;
     }
     
-    if (response.text !== undefined) {
-      return response.text;
-    }
-    
-    if (response.number !== undefined) {
-      return response.number.toString();
-    }
-    
+    // For single category outputs, just return the category name
     if (response.category !== undefined) {
       return response.category;
     }
     
+    // For text outputs
+    if (response.text !== undefined) {
+      return response.text;
+    }
+    
+    // For number outputs
+    if (response.number !== undefined) {
+      return response.number.toString();
+    }
+    
+    // For multiple categories
     if (response.categories !== undefined) {
       return response.categories.join(', ');
     }
     
+    // For URL outputs
     if (response.url !== undefined) {
       return response.url;
     }
     
+    // For date outputs
     if (response.date !== undefined) {
       return response.date;
     }
     
-    return 'No valid response';
+    // For structured data without any specific field extraction
+    if (response.structuredData !== undefined) {
+      try {
+        // First try to just use the "response" field if it exists
+        if (response.structuredData.response) {
+          return response.structuredData.response;
+        }
+        
+        // If no specific response field, use a stringified version but truncated for readability
+        const jsonStr = JSON.stringify(response.structuredData);
+        return jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
+      } catch (e) {
+        return JSON.stringify(response.structuredData);
+      }
+    }
+    
+    return '';
   }
 }

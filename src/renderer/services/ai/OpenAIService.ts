@@ -466,33 +466,70 @@ export class OpenAIService extends BaseAIProvider {
     options: ProcessPromptOptions
   ): AIModelResponse {
     try {
+      // Always include the full structured data for reference
+      const baseResponse: AIModelResponse = {
+        structuredData: structuredOutput
+      };
+      
+      // Add reasoning as a separate field whenever it's available
+      if (structuredOutput.reasoning) {
+        baseResponse.reasoning = structuredOutput.reasoning;
+      }
+      
+      // Process based on output type
       switch (options.outputType) {
         case 'singleCategory':
           if (structuredOutput.category) {
             return { 
+              ...baseResponse,
               category: structuredOutput.category,
-              text: structuredOutput.reasoning
+              // Don't include reasoning in the text field - this will be handled separately
+              // by the AIEnrichmentProcessor
             };
           }
           break;
           
         case 'categories':
           if (Array.isArray(structuredOutput.categories)) {
-            return { categories: structuredOutput.categories };
+            return { 
+              ...baseResponse,
+              categories: structuredOutput.categories
+            };
           }
           break;
           
         case 'number':
           if (typeof structuredOutput.number === 'number') {
-            return { number: structuredOutput.number };
+            return { 
+              ...baseResponse,
+              number: structuredOutput.number
+            };
+          }
+          break;
+          
+        case 'url':
+          if (structuredOutput.url) {
+            return { 
+              ...baseResponse,
+              url: structuredOutput.url
+            };
+          }
+          break;
+          
+        case 'date':
+          if (structuredOutput.date) {
+            return { 
+              ...baseResponse,
+              date: structuredOutput.date
+            };
           }
           break;
       }
       
       // If we couldn't process the structured output properly, return it as text
       return { 
-        text: JSON.stringify(structuredOutput),
-        structuredData: structuredOutput 
+        ...baseResponse,
+        text: JSON.stringify(structuredOutput)
       };
     } catch (error) {
       console.error('Error processing structured output:', error);

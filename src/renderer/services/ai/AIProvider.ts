@@ -31,6 +31,7 @@ export interface AIModelResponse {
   date?: string;
   error?: string;
   structuredData?: any; // For structured JSON responses
+  reasoning?: string; // For storing the reasoning behind decisions in structured outputs
 }
 
 /**

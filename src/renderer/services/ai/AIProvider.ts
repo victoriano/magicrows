@@ -30,6 +30,7 @@ export interface AIModelResponse {
   url?: string;
   date?: string;
   error?: string;
+  structuredData?: any; // For structured JSON responses
 }
 
 /**

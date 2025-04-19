@@ -74,27 +74,74 @@ export class OpenAIService extends BaseAIProvider {
       const apiEndpoint = 'https://api.openai.com/v1/chat/completions';
       console.log('Using OpenAI API endpoint:', apiEndpoint);
 
-      // Prepare the request body - exactly like the working curl command
-      const requestBody = JSON.stringify({
+      // Determine if we need to use structured output mode
+      const useStructuredOutput = this.shouldUseStructuredOutput(options);
+      console.log('💡 Using structured output?', useStructuredOutput ? 'YES' : 'NO');
+      
+      // Create request body based on whether structured output is needed
+      let requestBody: any = {
         model: options.model,
         messages,
         temperature: options.temperature || 0.2,
         max_tokens: 1000,
         n: 1,
         stream: false
-      });
+      };
+      
+      // Add response format and tool call for structured output if needed
+      if (useStructuredOutput) {
+        const responseFormat = { type: "json_object" };
+        const schema = this.generateOutputSchema(options);
+        
+        // Log the schema in detail
+        console.log('📋 Generated JSON Schema for structured output:');
+        console.log(JSON.stringify(schema, null, 2));
+        
+        // Log category details if applicable
+        if (options.outputType === 'singleCategory' && options.outputCategories) {
+          console.log('📝 Category options for structured output:');
+          options.outputCategories.forEach(cat => {
+            console.log(`  - "${cat.name}": ${cat.description || '(no description)'}`);
+          });
+        }
+        
+        requestBody = {
+          ...requestBody,
+          response_format: responseFormat,
+          tools: [{
+            type: "function",
+            function: {
+              name: "format_response",
+              description: "Format the response according to the required schema",
+              parameters: schema
+            }
+          }],
+          tool_choice: {
+            type: "function",
+            function: { name: "format_response" }
+          }
+        };
+      }
+      
+      // Log the full request for debugging (including all details)
+      console.log('📤 FULL OpenAI API Request:');
+      console.log(JSON.stringify(requestBody, null, 2));
+      
+      // Log the system message for debugging
+      console.log('🧠 System message:');
+      console.log(systemMessage);
+      
+      // Log the user prompt
+      console.log('🔍 User prompt:');
+      console.log(prompt);
 
       // Log detailed request information for debugging
       console.log('OpenAI API Request Body:', JSON.stringify({
-        model: options.model,
-        messages: messages.map(m => ({ 
+        ...requestBody,
+        messages: requestBody.messages.map(m => ({ 
           role: m.role, 
           content: m.content.length > 20 ? m.content.substring(0, 20) + '...' : m.content 
-        })),
-        temperature: options.temperature || 0.2,
-        max_tokens: 1000,
-        n: 1,
-        stream: false
+        }))
       }, null, 2));
       
       // Log the full messages for debugging
@@ -109,15 +156,11 @@ export class OpenAIService extends BaseAIProvider {
           'Authorization': 'Bearer sk-...' // Masked for security
         },
         body: {
-          model: options.model,
-          messages: messages.map(m => ({ 
+          ...requestBody,
+          messages: requestBody.messages.map(m => ({ 
             role: m.role, 
             content: m.content.length > 20 ? m.content.substring(0, 20) + '...' : m.content 
-          })),
-          temperature: options.temperature || 0.2,
-          max_tokens: 1000,
-          n: 1,
-          stream: false
+          }))
         }
       });
 
@@ -130,7 +173,7 @@ export class OpenAIService extends BaseAIProvider {
             'Authorization': `Bearer ${cleanApiKey}`,
             'Content-Type': 'application/json'
           },
-          body: requestBody
+          body: JSON.stringify(requestBody)
         });
       } catch (error) {
         console.error('Network error calling OpenAI API:', error);
@@ -176,7 +219,17 @@ export class OpenAIService extends BaseAIProvider {
           }
           
           if (responseText) {
-            console.log('OpenAI API Response Body (first 500 chars):', responseText.substring(0, 500));
+            // Log the full response body instead of just the first 500 characters
+            console.log('OpenAI API Response Body (full):', responseText);
+            
+            // Also log the parsed JSON if it's valid JSON
+            try {
+              const parsedResponse = JSON.parse(responseText);
+              console.log('OpenAI API Response (parsed):', parsedResponse);
+            } catch (e) {
+              // Not valid JSON or parsing error, just use the text version
+              console.log('Response is not valid JSON or could not be parsed');
+            }
           }
         }
       } catch (e) {
@@ -197,6 +250,23 @@ export class OpenAIService extends BaseAIProvider {
         throw new Error(`OpenAI API error: Failed to parse JSON response - ${e}`);
       }
 
+      // Check if the response is a structured output (tool call)
+      if (useStructuredOutput && responseData?.choices?.[0]?.message?.tool_calls) {
+        const toolCall = responseData.choices[0].message.tool_calls[0];
+        if (toolCall && toolCall.function && toolCall.function.name === 'format_response') {
+          try {
+            const structuredOutput = JSON.parse(toolCall.function.arguments);
+            console.log('✅ Structured output received:', structuredOutput);
+            
+            // Process the structured output based on the output type
+            return this.processStructuredOutput(structuredOutput, options);
+          } catch (e) {
+            console.warn('❌ Error parsing structured output:', e);
+          }
+        }
+      }
+
+      // Handle standard text output if not using structured output or if structured output failed
       // Check if the response data contains expected fields
       if (!responseData?.choices?.[0]?.message?.content) {
         console.warn('Unexpected response structure:', responseData);
@@ -221,6 +291,219 @@ export class OpenAIService extends BaseAIProvider {
   }
 
   /**
+   * Determines if structured output should be used based on options
+   * @param options The processing options
+   */
+  private shouldUseStructuredOutput(options: ProcessPromptOptions): boolean {
+    // Use structured output for categorical responses
+    return options.outputType === 'singleCategory' && 
+           Array.isArray(options.outputCategories) && 
+           options.outputCategories.length > 0;
+  }
+
+  /**
+   * Generates a JSON schema for structured output based on options
+   * @param options The processing options
+   */
+  private generateOutputSchema(options: ProcessPromptOptions): any {
+    console.log('⚙️ Generating output schema for:', options.outputType);
+    
+    // Start with a default schema for text output
+    let schema: any = {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The response text"
+        }
+      },
+      required: ["text"]
+    };
+
+    // For single category output, create a schema with enum values
+    if (options.outputType === 'singleCategory' && 
+        Array.isArray(options.outputCategories) && 
+        options.outputCategories.length > 0) {
+      
+      console.log('🔍 Generating schema for singleCategory output with', options.outputCategories.length, 'categories');
+      
+      const categoryNames = options.outputCategories.map(c => c.name);
+      console.log('📋 Category names:', categoryNames);
+      
+      const categoryDescriptions = Object.fromEntries(
+        options.outputCategories.map(c => [c.name, c.description || c.name])
+      );
+      console.log('📝 Category descriptions:', categoryDescriptions);
+      
+      schema = {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: categoryNames,
+            description: "The selected category",
+            enumDescriptions: categoryDescriptions
+          },
+          reasoning: {
+            type: "string",
+            description: "Optional reasoning for the selected category"
+          }
+        },
+        required: ["category"]
+      };
+      
+      console.log('✅ Generated singleCategory schema with', categoryNames.length, 'enum values');
+    }
+    
+    // For multiple categories, create a schema for an array of values
+    else if (options.outputType === 'categories' && 
+             Array.isArray(options.outputCategories) && 
+             options.outputCategories.length > 0) {
+      
+      console.log('🔍 Generating schema for multiple categories output with', options.outputCategories.length, 'possible categories');
+      
+      const categoryNames = options.outputCategories.map(c => c.name);
+      console.log('📋 Available category names:', categoryNames);
+      
+      schema = {
+        type: "object",
+        properties: {
+          categories: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: categoryNames
+            },
+            description: "Selected categories from the provided options"
+          },
+          reasoning: {
+            type: "string",
+            description: "Optional reasoning for the selected categories"
+          }
+        },
+        required: ["categories"]
+      };
+      
+      console.log('✅ Generated multiple categories schema with array of', categoryNames.length, 'possible enum values');
+    }
+    else if (options.outputType === 'number') {
+      console.log('🔍 Generating schema for number output');
+      
+      schema = {
+        type: "object",
+        properties: {
+          number: {
+            type: "number",
+            description: "The numerical response"
+          },
+          reasoning: {
+            type: "string",
+            description: "Optional reasoning for the provided number"
+          }
+        },
+        required: ["number"]
+      };
+      
+      console.log('✅ Generated number schema');
+    }
+    else if (options.outputType === 'url') {
+      console.log('🔍 Generating schema for URL output');
+      
+      schema = {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            format: "uri",
+            description: "The URL response"
+          },
+          reasoning: {
+            type: "string",
+            description: "Optional reasoning for the provided URL"
+          }
+        },
+        required: ["url"]
+      };
+      
+      console.log('✅ Generated URL schema');
+    }
+    else if (options.outputType === 'date') {
+      console.log('🔍 Generating schema for date output');
+      
+      schema = {
+        type: "object",
+        properties: {
+          date: {
+            type: "string",
+            format: "date",
+            description: "The date response in YYYY-MM-DD format"
+          },
+          reasoning: {
+            type: "string",
+            description: "Optional reasoning for the provided date"
+          }
+        },
+        required: ["date"]
+      };
+      
+      console.log('✅ Generated date schema');
+    }
+    else {
+      console.log('ℹ️ Using default text schema for output type:', options.outputType);
+    }
+    
+    console.log('🔄 Final schema structure:', JSON.stringify(schema, null, 2));
+    return schema;
+  }
+
+  /**
+   * Process structured output from the OpenAI API
+   * @param structuredOutput The structured output object
+   * @param options The processing options
+   */
+  private processStructuredOutput(
+    structuredOutput: any, 
+    options: ProcessPromptOptions
+  ): AIModelResponse {
+    try {
+      switch (options.outputType) {
+        case 'singleCategory':
+          if (structuredOutput.category) {
+            return { 
+              category: structuredOutput.category,
+              text: structuredOutput.reasoning
+            };
+          }
+          break;
+          
+        case 'categories':
+          if (Array.isArray(structuredOutput.categories)) {
+            return { categories: structuredOutput.categories };
+          }
+          break;
+          
+        case 'number':
+          if (typeof structuredOutput.number === 'number') {
+            return { number: structuredOutput.number };
+          }
+          break;
+      }
+      
+      // If we couldn't process the structured output properly, return it as text
+      return { 
+        text: JSON.stringify(structuredOutput),
+        structuredData: structuredOutput 
+      };
+    } catch (error) {
+      console.error('Error processing structured output:', error);
+      return { 
+        error: `Error processing structured output: ${error.message}`,
+        structuredData: structuredOutput
+      };
+    }
+  }
+
+  /**
    * Validate if the configuration is valid for OpenAI
    * @param config The AI enrichment configuration to validate
    */
@@ -238,7 +521,33 @@ export class OpenAIService extends BaseAIProvider {
    */
   private buildSystemMessage(options: ProcessPromptOptions): string {
     let systemMessage = 'You are a helpful AI assistant that generates structured data. ';
+    
+    // If we're using structured output via tool calls, provide different instructions
+    if (this.shouldUseStructuredOutput(options)) {
+      systemMessage = 'You are a helpful AI assistant that provides structured data in JSON format. ';
+      
+      if (options.outputType === 'singleCategory' && options.outputCategories) {
+        systemMessage += `You will be asked to evaluate something and choose from specific categories: ${
+          options.outputCategories.map(c => `"${c.name}" (${c.description || c.name})`).join(', ')
+        }. Your response must be formatted according to the JSON schema provided, with the "category" field containing one of the exact category names mentioned.`;
+      } else if (options.outputType === 'categories' && options.outputCategories) {
+        systemMessage += `You will be asked to select multiple categories from the following options: ${
+          options.outputCategories.map(c => `"${c.name}" (${c.description || c.name})`).join(', ')
+        }. Your response must be formatted as a JSON array according to the schema provided.`;
+      } else if (options.outputType === 'number') {
+        systemMessage += 'You will provide a numerical response formatted as JSON according to the schema provided.';
+      } else if (options.outputType === 'url') {
+        systemMessage += 'You will provide a URL response formatted as JSON according to the schema provided.';
+      } else if (options.outputType === 'date') {
+        systemMessage += 'You will provide a date response formatted as JSON according to the schema provided.';
+      } else {
+        systemMessage += 'Please format your response as JSON according to the schema provided.';
+      }
+      
+      return systemMessage;
+    }
 
+    // Otherwise use the original messages for text-based responses
     switch (options.outputType) {
       case 'text':
         systemMessage += 'Provide a clear, concise text response.';
@@ -287,6 +596,7 @@ export class OpenAIService extends BaseAIProvider {
     outputType: OutputConfig['outputType'],
     outputCategories?: OutputConfig['outputCategories']
   ): AIModelResponse {
+    // Original implementation remains unchanged
     try {
       const cleanedContent = content.trim();
       
@@ -382,69 +692,6 @@ export class OpenAIService extends BaseAIProvider {
     } catch (error) {
       return { 
         error: `Error parsing response: ${error instanceof Error ? error.message : 'Unknown error'}` 
-      };
-    }
-  }
-
-  private processCategoriesResponse(responseData: any, options: ProcessPromptOptions): AIModelResponse {
-    // Implement processing for categories response
-    const content = responseData.choices?.[0]?.message?.content || '';
-    
-    try {
-      // Try to parse categories from the response
-      const categories = content.split(',').map(cat => cat.trim());
-      return {
-        categories,
-        error: undefined
-      };
-    } catch (error) {
-      // If processing fails, return the raw text
-      return {
-        text: content,
-        error: undefined
-      };
-    }
-  }
-
-  private processSingleCategoryResponse(responseData: any, options: ProcessPromptOptions): AIModelResponse {
-    // Implement processing for single category response
-    const content = responseData.choices?.[0]?.message?.content || '';
-    
-    try {
-      // Try to extract a single category from the content
-      const category = content.trim();
-      return {
-        category,
-        error: undefined
-      };
-    } catch (error) {
-      // If processing fails, return the raw text
-      return {
-        text: content,
-        error: undefined
-      };
-    }
-  }
-
-  private processNumberResponse(responseData: any): AIModelResponse {
-    // Implement processing for number response
-    const content = responseData.choices?.[0]?.message?.content || '';
-    
-    try {
-      // Try to extract a number from the content
-      const match = content.match(/[-+]?[0-9]*\.?[0-9]+/);
-      const number = match ? parseFloat(match[0]) : undefined;
-      
-      return {
-        number,
-        text: content,
-        error: undefined
-      };
-    } catch (error) {
-      // If processing fails, return the raw text
-      return {
-        text: content,
-        error: undefined
       };
     }
   }

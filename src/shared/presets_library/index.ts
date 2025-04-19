@@ -17,13 +17,7 @@ export const allPresets: EnrichmentPreset[] = [
   sentimentAnalysisPreset,
   keywordExtractionPreset,
   dataEnrichmentPreset,
-  // Convert the automation tasks example to a proper preset
-  {
-    id: 'isco-enricher',
-    name: 'ISCO Enricher',
-    description: 'Identify tasks with high automation potential based on NACE and ISCO codes',
-    config: ISCOenricherPreset
-  }
+  ISCOenricherPreset
 ];
 
 // Also individually export the presets for direct imports where needed

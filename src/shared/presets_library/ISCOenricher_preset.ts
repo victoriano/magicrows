@@ -5,7 +5,7 @@ import { AIEnrichmentBlockConfig } from '../schemas/AIEnrichmentBlockSchema';
  * Example of an LLM processing job that identifies automation tasks for professions
  * and rates their novelty based on NACE and ISCO codes
  */
-export const ISCOenricherPreset: AIEnrichmentBlockConfig = {
+export const ISCOenricherConfig: AIEnrichmentBlockConfig = {
   "integrationName": "myOpenAI",
   "model": "gpt-4.1-nano",
   "temperature": 0.2,
@@ -49,5 +49,14 @@ export const ISCOenricherPreset: AIEnrichmentBlockConfig = {
   ]
 };
 
-// You can add more examples here as needed
+/**
+ * Metadata for the Data Enrichment preset
+ */
+export const ISCOenricherPreset = {
+  id: 'isco-enricher',
+  name: 'ISCO Enricher',
+  description: 'Identify tasks with high automation potential based on NACE and ISCO codes',
+  config: ISCOenricherConfig
+};
+
 

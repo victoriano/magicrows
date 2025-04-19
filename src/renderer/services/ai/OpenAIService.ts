@@ -283,9 +283,13 @@ export class OpenAIService extends BaseAIProvider {
         text: {
           type: "string",
           description: "The response text"
+        },
+        reasoning: {
+          type: "string",
+          description: "Explanation of your thought process"
         }
       },
-      required: ["text"]
+      required: ["text", "reasoning"]
     };
 
     // For single category output, create a schema with enum values
@@ -306,18 +310,18 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of your decision process and rationale"
+          },
           category: {
             type: "string",
             enum: categoryNames,
             description: "The selected category",
             enumDescriptions: categoryDescriptions
-          },
-          reasoning: {
-            type: "string",
-            description: "Optional reasoning for the selected category"
           }
         },
-        required: ["category"]
+        required: ["reasoning", "category"]
       };
       
       console.log('✅ Generated single category schema with', categoryNames.length, 'enum values');
@@ -336,6 +340,10 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of your decision process and rationale"
+          },
           categories: {
             type: "array",
             items: {
@@ -343,13 +351,9 @@ export class OpenAIService extends BaseAIProvider {
               enum: categoryNames
             },
             description: "Selected categories from the provided options"
-          },
-          reasoning: {
-            type: "string",
-            description: "Optional reasoning for the selected categories"
           }
         },
-        required: ["categories"]
+        required: ["reasoning", "categories"]
       };
       
       console.log('✅ Generated multiple category schema with array of', categoryNames.length, 'possible enum values');
@@ -360,16 +364,16 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of your calculation or estimation process"
+          },
           number: {
             type: "number",
             description: "The numerical response"
-          },
-          reasoning: {
-            type: "string",
-            description: "Optional reasoning for the provided number"
           }
         },
-        required: ["number"]
+        required: ["reasoning", "number"]
       };
       
       console.log('✅ Generated number schema');
@@ -380,17 +384,17 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of why this URL was selected"
+          },
           url: {
             type: "string",
             format: "uri",
             description: "The URL response"
-          },
-          reasoning: {
-            type: "string",
-            description: "Optional reasoning for the provided URL"
           }
         },
-        required: ["url"]
+        required: ["reasoning", "url"]
       };
       
       console.log('✅ Generated URL schema');
@@ -401,17 +405,17 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of why this date was selected"
+          },
           date: {
             type: "string",
             format: "date",
-            description: "The date response in YYYY-MM-DD format"
-          },
-          reasoning: {
-            type: "string",
-            description: "Optional reasoning for the provided date"
+            description: "The date response in ISO format (YYYY-MM-DD)"
           }
         },
-        required: ["date"]
+        required: ["reasoning", "date"]
       };
       
       console.log('✅ Generated date schema');
@@ -422,6 +426,10 @@ export class OpenAIService extends BaseAIProvider {
       schema = {
         type: "object",
         properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of your thought process for these items"
+          },
           items: {
             type: "array",
             items: {
@@ -430,7 +438,7 @@ export class OpenAIService extends BaseAIProvider {
             description: "Array of text items"
           }
         },
-        required: ["items"]
+        required: ["reasoning", "items"]
       };
       
       console.log('✅ Generated multiple text items schema');
@@ -558,30 +566,30 @@ export class OpenAIService extends BaseAIProvider {
     
     // If we're using structured output via tool calls, provide different instructions
     if (this.shouldUseStructuredOutput(options)) {
-      systemMessage = 'You are a data extraction assistant that provides structured data in the EXACT format specified. ';
+      systemMessage = 'You are a data extraction assistant that provides structured data in the EXACT format specified. Always include your reasoning for any decision or classification you make. ';
       
       if (options.outputType === 'category' && options.outputCardinality !== 'multiple' && options.outputCategories) {
-        systemMessage += `You must select exactly ONE category from this list: ${
+        systemMessage += `First provide your reasoning, then select exactly ONE category from this list: ${
           options.outputCategories.map(c => `"${c.name}" (${c.description || c.name})`).join(', ')
-        }. Your response MUST be formatted as a simple JSON object with a single "category" field containing one of the exact category names listed. Do not nest the response or add any other fields.`;
+        }. Your response MUST be formatted as a simple JSON object with a "reasoning" field explaining your decision process, and a "category" field containing one of the exact category names listed. Do not nest the response or add any other fields.`;
       } else if (options.outputType === 'category' && options.outputCardinality === 'multiple' && options.outputCategories) {
-        systemMessage += `You must select one or more categories from this list: ${
+        systemMessage += `First provide your reasoning, then select one or more categories from this list: ${
           options.outputCategories.map(c => `"${c.name}" (${c.description || c.name})`).join(', ')
-        }. Your response MUST be formatted as a simple JSON object with a "categories" array field containing the exact category names. Do not nest the response or add any other fields.`;
+        }. Your response MUST be formatted as a simple JSON object with a "reasoning" field explaining your decision process, and a "categories" array field containing the exact category names. Do not nest the response or add any other fields.`;
       } else if (options.outputType === 'number') {
-        systemMessage += 'You must provide a numerical response as a simple JSON object with a "number" field. Do not nest the response or add any other fields.';
+        systemMessage += 'First provide your reasoning, then provide a numerical response as a simple JSON object with a "reasoning" field explaining your calculation or estimation, and a "number" field. Do not nest the response or add any other fields.';
       } else if (options.outputType === 'url') {
-        systemMessage += 'You must provide a URL response as a simple JSON object with a "url" field. Do not nest the response or add any other fields.';
+        systemMessage += 'First provide your reasoning, then provide a URL response as a simple JSON object with a "reasoning" field explaining your choice, and a "url" field. Do not nest the response or add any other fields.';
       } else if (options.outputType === 'date') {
-        systemMessage += 'You must provide a date response as a simple JSON object with a "date" field in ISO format (YYYY-MM-DD). Do not nest the response or add any other fields.';
+        systemMessage += 'First provide your reasoning, then provide a date response as a simple JSON object with a "reasoning" field explaining your choice, and a "date" field in ISO format (YYYY-MM-DD). Do not nest the response or add any other fields.';
       } else if (options.outputType === 'text') {
         if (options.outputCardinality === 'multiple') {
-          systemMessage += 'You must provide an array of text items as a simple JSON object with a "items" array field. Do not nest the response or add any other fields.';
+          systemMessage += 'First provide your reasoning, then provide an array of text items as a simple JSON object with a "reasoning" field explaining your choices, and an "items" array field. Do not nest the response or add any other fields.';
         } else {
-          systemMessage += 'You must format your response as a simple JSON object according to the schema provided, without any nesting or additional fields.';
+          systemMessage += 'First provide your reasoning, then provide a text response as a simple JSON object with a "reasoning" field explaining your response, and a "text" field. Do not nest the response or add any other fields.';
         }
       } else {
-        systemMessage += 'You must format your response as a simple JSON object according to the schema provided, without any nesting or additional fields.';
+        systemMessage += 'You must format your response as a simple JSON object according to the schema provided, always including a "reasoning" field explaining your choices, without any nesting or additional fields.';
       }
       
       return systemMessage;

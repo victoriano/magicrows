@@ -5,23 +5,23 @@ import { AIEnrichmentBlockConfig } from '../schemas/AIEnrichmentBlockSchema';
  * Example of an LLM processing job that identifies automation tasks for professions
  * and rates their novelty based on NACE and ISCO codes
  */
-export const automationTasksExample: AIEnrichmentBlockConfig = {
+export const ISCOenricherPreset: AIEnrichmentBlockConfig = {
   "integrationName": "myOpenAI",
-  "model": "gpt4o",
+  "model": "gpt-4.1-nano",
   "temperature": 0.2,
   "mode": "preview",
-  "previewRowCount": 3,
+  "previewRowCount": 2,
   "outputFormat": "newRows",
   "contextColumns": ["nace", "isco"],
   "outputs": [
     {
       "name": "automation_tasks",
-      "prompt": "For the profession described by NACE code '{nace}' and ISCO code '{isco}', identify 5 specific tasks currently performed that have high potential for automation using modern AI technologies (like LLMs, computer vision, etc.). Focus on tasks where AI could form the core of a potential startup idea. Please list only the tasks, one per line for a text output",
+      "prompt": "For the profession described by NACE code {{nace}} and ISCO code {{isco}}, identify 5 specific tasks currently performed that have high potential for automation using modern AI technologies (like LLMs, computer vision, etc.). Focus on tasks where AI could form the core of a potential startup idea. Please list only the tasks, one per line for a text output",
       "outputType": "text"
     },
     {
       "name": "novelty_rating",
-      "prompt": "Based on the automation tasks identified for the profession with NACE code '{nace}' and ISCO code '{isco}', evaluate how novel these automation opportunities are in the current market. Consider factors like existing solutions, unique applications, and market saturation. Select the most appropriate rating category.",
+      "prompt": "Based on the automation tasks identified for the profession with NACE code {{nace}} and ISCO code {{isco}}, evaluate how novel these automation opportunities are in the current market. Consider factors like existing solutions, unique applications, and market saturation. Select the most appropriate rating category.",
       "outputType": "singleCategory",
       "outputCategories": [
         {

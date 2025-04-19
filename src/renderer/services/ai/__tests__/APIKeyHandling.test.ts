@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AIProviderFactory } from '../AIProvider';
 import { OpenAIService } from '../OpenAIService';
 import { PerplexityService } from '../PerplexityService';
-import { automationTasksExample } from '../../../../shared/schemas_examples/AIEnrichmentBlock_example';
+import { automationTasksExample } from '../../../../shared/presets_library/AIEnrichmentBlock_example';
 
 // Create an actual mock of the Electron API for secure storage
 const mockSecureStorage = {

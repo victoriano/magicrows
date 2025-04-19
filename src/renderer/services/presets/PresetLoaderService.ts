@@ -1,14 +1,14 @@
 import { EnrichmentPreset } from '../../store/slices/aiEnrichmentSlice';
 import { AIEnrichmentBlockConfig } from '../../../shared/schemas/AIEnrichmentBlockSchema';
-import { allPresets } from '../../../shared/schemas_examples';
+import { allPresets } from '../../../shared/presets_library';
 
 /**
  * Interface for the PresetLoaderService
- * Responsible for loading AI enrichment presets from the schemas_examples directory
+ * Responsible for loading AI enrichment presets from the presets_library directory
  */
 export interface IPresetLoaderService {
   /**
-   * Load all available presets from the schemas_examples directory
+   * Load all available presets from the presets_library directory
    * @returns Array of EnrichmentPreset objects
    */
   loadAllPresets(): Promise<EnrichmentPreset[]>;
@@ -27,7 +27,7 @@ export interface IPresetLoaderService {
 }
 
 /**
- * Service that loads AI enrichment presets from the schemas_examples directory
+ * Service that loads AI enrichment presets from the presets_library directory
  */
 export class PresetLoaderService implements IPresetLoaderService {
   private static instance: PresetLoaderService;
@@ -77,7 +77,7 @@ export class PresetLoaderService implements IPresetLoaderService {
   }
   
   /**
-   * Load all available presets from the schemas_examples directory
+   * Load all available presets from the presets_library directory
    * @returns Array of EnrichmentPreset objects
    */
   public async loadAllPresets(): Promise<EnrichmentPreset[]> {
@@ -96,7 +96,7 @@ export class PresetLoaderService implements IPresetLoaderService {
   }
   
   /**
-   * Refresh the presets cache and reload from the schema examples
+   * Refresh the presets cache and reload from the presets_library
    */
   public async refreshPresets(): Promise<void> {
     try {

@@ -20,7 +20,7 @@ export const dataEnrichmentConfig: AIEnrichmentBlockConfig = {
       outputType: 'text'
     },
     {
-      name: 'Example of Startup',
+      name: 'Example of Startups',
       prompt: 'For this sector and occupation: {{nace}} {{isco}} list disrupting startups using AI already to serve problems',
       outputType: 'text'
     }

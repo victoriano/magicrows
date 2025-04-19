@@ -113,7 +113,7 @@ const App: React.FC = () => {
 
   // Load external presets when the app initializes
   useEffect(() => {
-    console.log('Loading external presets from schemas_examples folder');
+    console.log('Loading external presets from presets_library folder');
     dispatch(loadExternalPresets());
   }, [dispatch]);
 

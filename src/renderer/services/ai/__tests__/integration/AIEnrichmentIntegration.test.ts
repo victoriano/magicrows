@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { automationTasksExample } from '../../../../../shared/schemas_examples/AIEnrichmentBlock_example';
+import { automationTasksExample } from '../../../../../shared/presets_library/AIEnrichmentBlock_example';
 import { AIEnrichmentBlockConfig } from '../../../../../shared/schemas/AIEnrichmentBlockSchema';
 
 // Mock the AIEnrichmentProcessor - we'll verify integration without actually calling providers

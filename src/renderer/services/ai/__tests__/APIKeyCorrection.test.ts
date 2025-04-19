@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PerplexityService } from '../PerplexityService';
 import { OpenAIService } from '../OpenAIService';
-import { automationTasksExample } from '../../../../shared/schemas_examples/AIEnrichmentBlock_example';
+import { automationTasksExample } from '../../../../shared/presets_library/AIEnrichmentBlock_example';
 
 /**
  * This test demonstrates proper API key handling and provides a debugging/verification

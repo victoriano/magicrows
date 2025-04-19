@@ -5,7 +5,7 @@ import { AIProviderFactory } from '../AIProvider';
 import { AIProvider } from '../AIProvider';
 import { ProcessPromptOptions } from '../AIProvider';
 import { AIModelResponse } from '../AIProvider';
-import { automationTasksExample } from '../../../../shared/schemas_examples/AIEnrichmentBlock_example';
+import { automationTasksExample } from '../../../../shared/presets_library/AIEnrichmentBlock_example';
 
 /**
  * This test verifies the complete flow from saving an API key to retrieving it

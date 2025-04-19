@@ -6,7 +6,8 @@
 import { sentimentAnalysisPreset } from './sentiment_analysis_preset';
 import { keywordExtractionPreset } from './keyword_extraction_preset';
 import { dataEnrichmentPreset } from './data_enrichment_preset';
-import { ISCOenricherPreset } from './ISCOenricher_preset';
+import { ISCONoveltyPreset } from './ISCONovelty_preset';
+import { ISCOTasksPreset } from './ISCOTasks_preset';
 import { EnrichmentPreset } from '../../renderer/store/slices/aiEnrichmentSlice';
 
 /**
@@ -17,13 +18,13 @@ export const allPresets: EnrichmentPreset[] = [
   sentimentAnalysisPreset,
   keywordExtractionPreset,
   dataEnrichmentPreset,
-  ISCOenricherPreset
+  ISCONoveltyPreset,
+  ISCOTasksPreset
 ];
 
 // Also individually export the presets for direct imports where needed
 export { 
   sentimentAnalysisPreset, 
   keywordExtractionPreset, 
-  dataEnrichmentPreset, 
-  ISCOenricherPreset 
+  dataEnrichmentPreset
 };

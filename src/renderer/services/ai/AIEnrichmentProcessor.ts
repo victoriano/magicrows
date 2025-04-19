@@ -392,54 +392,70 @@ export class AIEnrichmentProcessor {
     originalRows: string[][],
     errors: { rowIndex: number; error: string }[]
   ): EnrichmentProcessingResult {
+    // First collect all unique output names to create our header structure
+    const outputFields = new Set<string>();
+    const outputReasoningFields = new Set<string>();
+    
+    rowResults.forEach(rowResult => {
+      rowResult.outputs.forEach(output => {
+        // Add the output field name
+        outputFields.add(output.outputName);
+        
+        // If this output has reasoning, add a reasoning field
+        if (output.response.reasoning !== undefined || 
+           (output.outputType === 'singleCategory' && output.response.category !== undefined)) {
+          outputReasoningFields.add(`${output.outputName}_reasoning`);
+        }
+      });
+    });
+    
+    // Create the new headers by adding all unique output fields and reasoning fields
     const newHeaders = [
       ...originalHeaders,
-      'enrichment_output_field',
-      'enrichment_output_value'
+      ...Array.from(outputFields),
+      ...Array.from(outputReasoningFields)
     ];
-    
-    // Add reasoning header when appropriate outputs exist
-    if (rowResults.some(result => 
-      result.outputs.some(output => 
-        output.response.reasoning !== undefined ||
-        (output.outputType === 'singleCategory' && output.response.category !== undefined)
-      )
-    )) {
-      newHeaders.push('enrichment_output_reasoning');
-    }
     
     const newRows: string[][] = [];
     
+    // Process each result row
     rowResults.forEach(rowResult => {
       if (rowResult.error) return; // Skip rows with errors
       
       const originalRow = originalRows[rowResult.rowIndex];
       
+      // For each output field, create a new row in the result
+      const outputsByName = new Map<string, OutputProcessingResult>();
       rowResult.outputs.forEach(output => {
-        const newRow = [
-          ...originalRow,
-          output.outputName,
-          this.formatOutputValue(output.response)
-        ];
-        
-        // Add reasoning as a separate column if it exists or for singleCategory outputs
-        if (newHeaders.includes('enrichment_output_reasoning')) {
-          // Use the reasoning field if it exists
-          if (output.response.reasoning !== undefined) {
-            newRow.push(output.response.reasoning);
-          } 
-          // If no reasoning but this is a category output, add an empty cell
-          else if (output.outputType === 'singleCategory' && output.response.category !== undefined) {
-            newRow.push('');
-          } 
-          // Otherwise leave it empty
-          else {
-            newRow.push('');
-          }
-        }
-        
-        newRows.push(newRow);
+        outputsByName.set(output.outputName, output);
       });
+      
+      // Create a new row with all the values
+      const newRow = [...originalRow];
+      
+      // Add values for each output field
+      outputFields.forEach(fieldName => {
+        const output = outputsByName.get(fieldName);
+        if (output) {
+          newRow.push(this.formatOutputValue(output.response));
+        } else {
+          newRow.push(''); // Empty cell for missing output
+        }
+      });
+      
+      // Add values for each reasoning field
+      outputReasoningFields.forEach(reasoningField => {
+        const fieldName = reasoningField.replace('_reasoning', '');
+        const output = outputsByName.get(fieldName);
+        
+        if (output && output.response.reasoning) {
+          newRow.push(output.response.reasoning);
+        } else {
+          newRow.push(''); // Empty cell for missing reasoning
+        }
+      });
+      
+      newRows.push(newRow);
     });
     
     return {

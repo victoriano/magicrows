@@ -40,6 +40,33 @@ export const ISCONoveltyConfig: AIEnrichmentBlockConfig = {
           "description": "Identical to widely available solutions; oversaturated market with numerous established competitors"
         }
       ]
+    },
+    {
+      "name": "best_country_match",
+      "prompt": "Based on the industry sector with NACE code {{nace}} and occupation with ISCO code {{isco}}, analyze which of the following European countries has the strongest and most advanced industry in this specific sector and occupation. Consider factors like technological advancement, market leadership, innovation, workforce expertise, and industry presence. Select the most appropriate country and reason base on specific companies names that are strong for that country in tha industry",
+      "outputType": "singleCategory",
+      "outputCategories": [
+        {
+          "name": "Germany",
+          "description": "Businesses based in Germany"
+        },
+        {
+          "name": "France",
+          "description": "Businesses based in France"
+        },
+        {
+          "name": "United Kingdom",
+          "description": "Businesses based in the United Kingdom"
+        },
+        {
+          "name": "Italy",
+          "description": "Businesses based in Italy"
+        },
+        {
+          "name": "Spain",
+          "description": "Businesses based in Spain"
+        }
+      ]
     }
   ]
 };
@@ -53,5 +80,3 @@ export const ISCONoveltyPreset = {
   description: 'Identify tasks with high automation potential based on NACE and ISCO codes',
   config: ISCONoveltyConfig
 };
-
-

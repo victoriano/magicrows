@@ -30,7 +30,7 @@ export interface ExternalApi {
 
 export interface ElectronAPI {
   openFile: () => Promise<string | null>;
-  saveFile: () => Promise<string | null>;
+  saveFile: (defaultPath?: string) => Promise<string | null>;
   selectDirectory: () => Promise<string | null>;
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<boolean>;

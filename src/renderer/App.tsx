@@ -312,7 +312,10 @@ const App: React.FC = () => {
       },
       // Mock other methods as needed
       openFile: async () => null,
-      saveFile: async () => null,
+      saveFile: async (defaultPath?: string) => {
+        console.log(`MOCK: Save file dialog with default name: ${defaultPath || 'untitled.csv'}`);
+        return '/mock/path/to/saved/file.csv';
+      },
       selectDirectory: async () => {
         console.log('MOCK: Selecting directory');
         return '/mock/output/directory';
@@ -652,6 +655,7 @@ const App: React.FC = () => {
     // Determine which dataset view is active
     const rowsToExport = displayRows;
     const headersToExport = displayHeaders;
+    const isEnriched = aiEnrichment?.activeDataset === 'enriched';
 
     if (!rowsToExport || rowsToExport.length === 0) {
       alert('No data to export');
@@ -664,10 +668,34 @@ const App: React.FC = () => {
     });
 
     try {
-      const savePath = await window.electronAPI.saveFile();
+      // Create a default filename based on the current file and which dataset is shown
+      let defaultFilename = currentFileName?.replace(/\s+/g, '_') || 'export.csv';
+      
+      // If the filename ends with .csv, remove it to add our suffix
+      if (defaultFilename.toLowerCase().endsWith('.csv')) {
+        defaultFilename = defaultFilename.slice(0, -4);
+      }
+      
+      // Add the appropriate suffix
+      defaultFilename = isEnriched 
+        ? `${defaultFilename}_enriched.csv` 
+        : `${defaultFilename}.csv`;
+      
+      // Log the filename we're using for export
+      console.log(`Exporting ${isEnriched ? 'enriched' : 'original'} dataset with filename: ${defaultFilename}`);
+      
+      // Pass defaultFilename to the save dialog
+      let savePath = await window.electronAPI.saveFile(defaultFilename);
+      
       if (savePath) {
+        // The savePath already contains the full path from the dialog
+        // We only need to ensure it has .csv extension
+        if (!savePath.toLowerCase().endsWith('.csv')) {
+          savePath = `${savePath}.csv`;
+        }
+        
         await window.electronAPI.writeFile(savePath, csvString);
-        console.log('CSV exported to', savePath);
+        console.log(`CSV saved to: ${savePath}`);
       }
     } catch (err) {
       console.error('Error exporting CSV:', err);

@@ -277,9 +277,11 @@ ipcMain.handle('dialog:selectDirectory', async () => {
   return filePaths[0];
 });
 
-ipcMain.handle('dialog:saveFile', async () => {
+ipcMain.handle('dialog:saveFile', async (_, defaultPath) => {
   if (!mainWindow) return null;
+  console.log(`Dialog saveFile requested with default path: ${defaultPath}`);
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultPath,
     filters: [{ name: 'CSV', extensions: ['csv'] }]
   });
   if (canceled || !filePath) return null;

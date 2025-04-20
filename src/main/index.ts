@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import fetch from 'node-fetch';
+import * as fs from 'fs';
 
 // Add type declaration for import.meta.env
 declare global {
@@ -106,17 +107,34 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('dialog:saveFile', async () => {
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      filters: [
-        { name: 'CSV Files', extensions: ['csv'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
-    if (canceled) {
+  // Save file dialog
+  ipcMain.handle('dialog:saveFile', async (event, defaultPath) => {
+    console.log('Save file dialog requested with default path:', defaultPath);
+    
+    if (!mainWindow) {
+      console.error('Cannot show save dialog: main window is null');
       return null;
-    } else {
+    }
+    
+    try {
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        defaultPath: defaultPath || 'Untitled.csv',
+        filters: [
+          { name: 'CSV Files', extensions: ['csv'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (canceled) {
+        console.log('Save dialog was canceled');
+        return null;
+      }
+      
+      console.log('User selected path:', filePath);
       return filePath;
+    } catch (error) {
+      console.error('Error showing save dialog:', error);
+      return null;
     }
   });
 
@@ -128,6 +146,42 @@ function registerIpcHandlers() {
       return null;
     } else {
       return filePaths[0];
+    }
+  });
+
+  // Save file dialog
+  ipcMain.handle('save-file', async (event, defaultPath) => {
+    console.log('Save file requested with default path:', defaultPath);
+    
+    if (!mainWindow) {
+      console.error('Cannot show save dialog: main window is null');
+      return null;
+    }
+    
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultPath || 'untitled.csv',
+      filters: [
+        { name: 'CSV Files', extensions: ['csv'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePath) {
+      console.log('User selected path:', result.filePath);
+      return result.filePath;
+    }
+    return null;
+  });
+  
+  // Write file
+  ipcMain.handle('write-file', async (event, path, content) => {
+    console.log('Writing file to:', path);
+    try {
+      fs.writeFileSync(path, content, 'utf8');
+      return true;
+    } catch (error) {
+      console.error('Error writing file:', error);
+      return false;
     }
   });
 }

@@ -14,7 +14,7 @@ window.addEventListener('error', (event) => {
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
-  saveFile: () => ipcRenderer.invoke('dialog:saveFile'),
+  saveFile: (defaultPath?: string) => ipcRenderer.invoke('dialog:saveFile', defaultPath),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   readFile: (path: string) => ipcRenderer.invoke('file:read', path),
   writeFile: (path: string, content: string) => ipcRenderer.invoke('file:write', path, content),

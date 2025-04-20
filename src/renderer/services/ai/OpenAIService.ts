@@ -92,8 +92,23 @@ export class OpenAIService extends BaseAIProvider {
       // Attach response_format for structured output if needed
       if (useStructuredOutput) {
         const schema = options.responseSchema || this.generateOutputSchema(options);
-        console.log('📋 Using JSON response format with schema:', JSON.stringify(schema));
-        requestBody.response_format = { type: "json_object" };
+
+        // Ensure strict schema disallows extraneous keys
+        if (schema && schema.type === 'object' && schema.additionalProperties === undefined) {
+          schema.additionalProperties = false;
+        }
+
+        const responseFormat = {
+          type: "json_schema",
+          json_schema: {
+            name: options.providerOptions?.schemaName || 'structured_output',
+            schema,
+            strict: true
+          }
+        } as const;
+
+        console.log('📋 Using JSON Schema response format:', JSON.stringify(responseFormat, null, 2));
+        requestBody.response_format = responseFormat;
       }
       
       // Log the full request for debugging (including all details)
@@ -423,22 +438,14 @@ export class OpenAIService extends BaseAIProvider {
     else if (options.outputType === 'text' && options.outputCardinality === 'multiple') {
       console.log('🔍 Generating schema for multiple text items');
       
+      // For multiple text items, we want just an array of strings without reasoning
+      // The reasoning will be handled separately by the AIEnrichmentProcessor
       schema = {
-        type: "object",
-        properties: {
-          reasoning: {
-            type: "string",
-            description: "Explanation of your thought process for these items"
-          },
-          items: {
-            type: "array",
-            items: {
-              type: "string"
-            },
-            description: "Array of text items"
-          }
+        type: "array",
+        items: {
+          type: "string"
         },
-        required: ["reasoning", "items"]
+        description: "Array of text items"
       };
       
       console.log('✅ Generated multiple text items schema');
@@ -461,6 +468,15 @@ export class OpenAIService extends BaseAIProvider {
     options: ProcessPromptOptions
   ): AIModelResponse {
     try {
+      // Special case for text with multiple cardinality - we expect a direct array
+      if (options.outputType === 'text' && options.outputCardinality === 'multiple') {
+        if (Array.isArray(structuredOutput)) {
+          return {
+            items: structuredOutput.map(item => String(item))
+          };
+        }
+      }
+
       // Always include the full structured data for reference
       const baseResponse: AIModelResponse = {
         structuredData: structuredOutput
@@ -517,7 +533,7 @@ export class OpenAIService extends BaseAIProvider {
           break;
           
         case 'text':
-          if (options.outputCardinality === 'multiple' && Array.isArray(structuredOutput.items)) {
+          if (options.outputCardinality === 'multiple') {
             return { 
               ...baseResponse,
               items: structuredOutput.items
@@ -584,7 +600,7 @@ export class OpenAIService extends BaseAIProvider {
         systemMessage += 'First provide your reasoning, then provide a date response as a simple JSON object with a "reasoning" field explaining your choice, and a "date" field in ISO format (YYYY-MM-DD). Do not nest the response or add any other fields.';
       } else if (options.outputType === 'text') {
         if (options.outputCardinality === 'multiple') {
-          systemMessage += 'First provide your reasoning, then provide an array of text items as a simple JSON object with a "reasoning" field explaining your choices, and an "items" array field. Do not nest the response or add any other fields.';
+          systemMessage += 'Provide an array of text items in JSON format. Each item should be a string in the array. Do not include any explanation or reasoning in the response - that will be handled separately.';
         } else {
           systemMessage += 'First provide your reasoning, then provide a text response as a simple JSON object with a "reasoning" field explaining your response, and a "text" field. Do not nest the response or add any other fields.';
         }
@@ -641,7 +657,7 @@ export class OpenAIService extends BaseAIProvider {
    */
   private processOutput(
     content: string, 
-    outputType: OutputConfig['outputType'],
+    outputType: OutputConfig['outputType'] | 'categories',
     outputCategories?: OutputConfig['outputCategories']
   ): AIModelResponse {
     try {

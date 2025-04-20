@@ -19,6 +19,7 @@ interface DataRowContext {
 interface OutputProcessingResult {
   outputName: string;
   outputType: OutputConfig['outputType'];
+  outputCardinality?: OutputConfig['outputCardinality'];
   response: AIModelResponse;
 }
 
@@ -176,7 +177,8 @@ export class AIEnrichmentProcessor {
           model: config.model,
           temperature: config.temperature || 0.2,
           outputType: outputConfig.outputType,
-          outputCategories: outputConfig.outputCategories
+          outputCategories: outputConfig.outputCategories,
+          outputCardinality: outputConfig.outputCardinality
         };
         
         // Auto‑attach JSON schema for multiple outputs
@@ -198,6 +200,7 @@ export class AIEnrichmentProcessor {
         outputs.push({
           outputName: outputConfig.name,
           outputType: outputConfig.outputType,
+          outputCardinality: outputConfig.outputCardinality,
           response
         });
       } catch (error) {
@@ -355,33 +358,80 @@ export class AIEnrichmentProcessor {
     originalRows: string[][],
     errors: { rowIndex: number; error: string }[]
   ): EnrichmentProcessingResult {
-    // Create new headers: original headers + new output columns
+    // --- Build headers: original + output columns + reasoning columns (if any) ---
     const newHeaders = [...originalHeaders];
+    // Keep an ordered list of output names for later lookup
+    const outputNames: string[] = [];
     config.outputs.forEach(output => {
       newHeaders.push(output.name);
+      outputNames.push(output.name);
     });
-    
-    // Create new rows with added columns
+
+    // Detect which outputs actually provide reasoning so we can add *_reasoning columns
+    const outputReasoningFields = new Set<string>();
+    rowResults.forEach(rowResult => {
+      rowResult.outputs.forEach(output => {
+        if (
+          output.response.reasoning !== undefined ||
+          (output.outputType === 'category' && output.response.category !== undefined) ||
+          (output.response.structuredData && output.response.structuredData.reasoning !== undefined) ||
+          (output.outputType === 'text' && output.outputCardinality === 'multiple')
+        ) {
+          outputReasoningFields.add(`${output.outputName}_reasoning`);
+        }
+      });
+    });
+
+    const reasoningHeaders = Array.from(outputReasoningFields);
+    newHeaders.push(...reasoningHeaders);
+
+    // --- Build rows ---
     const newRows = originalRows.map((originalRow, rowIndex) => {
       const rowResult = rowResults.find(result => result.rowIndex === rowIndex);
-      
-      // If this row was not processed or had an error, fill with placeholders
+
+      // Placeholders for each section
+      const emptyOutputs = outputNames.map(() => '');
+      const emptyReasonings = reasoningHeaders.map(() => '');
+
+      // Skip rows that failed or were not processed
       if (!rowResult || rowResult.error) {
-        return [...originalRow, ...config.outputs.map(() => '')];
+        return [...originalRow, ...emptyOutputs, ...emptyReasonings];
       }
-      
-      // Add output values as new columns
-      const outputValues = config.outputs.map(outputConfig => {
-        const output = rowResult.outputs.find(o => o.outputName === outputConfig.name);
-        if (!output) return '';
-        
-        // Format based on output type
-        return this.formatOutputValue(output.response);
+
+      // Map outputs by name for quick lookup
+      const outputsByName = new Map<string, OutputProcessingResult>();
+      rowResult.outputs.forEach(o => outputsByName.set(o.outputName, o));
+
+      // Output columns
+      const outputValues = outputNames.map(name => {
+        const out = outputsByName.get(name);
+        return out ? this.formatOutputValue(out.response) : '';
       });
-      
-      return [...originalRow, ...outputValues];
+
+      // Reasoning columns
+      const reasoningValues = reasoningHeaders.map(reasoningHeader => {
+        const baseName = reasoningHeader.replace('_reasoning', '');
+        const output = outputsByName.get(baseName);
+
+        if (!output) return '';
+
+        const resp = output.response;
+        if (resp.reasoning) return resp.reasoning;
+        if (resp.structuredData && resp.structuredData.reasoning) return resp.structuredData.reasoning;
+        if (
+          resp.structuredData &&
+          output.outputType === 'text' &&
+          output.outputCardinality === 'multiple' &&
+          resp.structuredData.reasoning
+        ) {
+          return resp.structuredData.reasoning;
+        }
+        return '';
+      });
+
+      return [...originalRow, ...outputValues, ...reasoningValues];
     });
-    
+
     return {
       newHeaders,
       newRows,
@@ -415,9 +465,11 @@ export class AIEnrichmentProcessor {
         // Add the output field name
         outputFields.add(output.outputName);
         
-        // If this output has reasoning, add a reasoning field
+        // Check for reasoning in various places
         if (output.response.reasoning !== undefined || 
-           (output.outputType === 'singleCategory' && output.response.category !== undefined)) {
+           (output.outputType === 'category' && output.response.category !== undefined) ||
+           (output.response.structuredData && output.response.structuredData.reasoning !== undefined) ||
+           (output.outputType === 'text' && output.outputCardinality === 'multiple')) {
           outputReasoningFields.add(`${output.outputName}_reasoning`);
         }
       });
@@ -462,9 +514,32 @@ export class AIEnrichmentProcessor {
         const fieldName = reasoningField.replace('_reasoning', '');
         const output = outputsByName.get(fieldName);
         
+        console.log(`Extracting reasoning for ${fieldName}:`, output?.response);
+        
+        // Check for reasoning directly in the response
         if (output && output.response.reasoning) {
+          console.log(`Found direct reasoning: ${output.response.reasoning}`);
           newRow.push(output.response.reasoning);
+        } 
+        // Check for reasoning in the structuredData
+        else if (output && output.response.structuredData && output.response.structuredData.reasoning) {
+          console.log(`Found reasoning in structuredData: ${output.response.structuredData.reasoning}`);
+          newRow.push(output.response.structuredData.reasoning);
+        }
+        // Special case for the format we're seeing in the output with tasks array
+        else if (output && output.response.structuredData && 
+                output.outputType === 'text' && output.outputCardinality === 'multiple') {
+          // Try to find reasoning in different places
+          const structuredData = output.response.structuredData;
+          if (structuredData.reasoning) {
+            console.log(`Found reasoning for tasks: ${structuredData.reasoning}`);
+            newRow.push(structuredData.reasoning);
+          } else {
+            console.log('No reasoning found for tasks');
+            newRow.push(''); // Empty cell for missing reasoning
+          }
         } else {
+          console.log('No reasoning found');
           newRow.push(''); // Empty cell for missing reasoning
         }
       });
@@ -498,6 +573,33 @@ export class AIEnrichmentProcessor {
     // For text outputs
     if (response.text !== undefined) {
       return response.text;
+    }
+    
+    // For multiple text items
+    if (response.items !== undefined) {
+      // If we have items array directly, use it
+      if (Array.isArray(response.items)) {
+        return JSON.stringify(response.items);
+      }
+      
+      // Handle other potential formats
+    }
+    
+    // Handle the case where we get a structured response with text field that contains an array
+    if (response.structuredData) {
+      if (response.structuredData.text && Array.isArray(response.structuredData.text)) {
+        return JSON.stringify(response.structuredData.text);
+      }
+      
+      // Handle the "tasks" array format we're seeing in the output
+      if (response.structuredData.tasks && Array.isArray(response.structuredData.tasks)) {
+        return JSON.stringify(response.structuredData.tasks);
+      }
+      
+      // Special case for the format we're seeing in the output
+      if (response.structuredData.reasoning && response.structuredData.text) {
+        return JSON.stringify(response.structuredData.text);
+      }
     }
     
     // For number outputs

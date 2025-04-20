@@ -11,7 +11,7 @@ export const ISCONoveltyConfig: AIEnrichmentBlockConfig = {
   "temperature": 0.2,
   "mode": "preview",
   "previewRowCount": 2,
-  "outputFormat": "newRows",
+  "outputFormat": "newColumns",
   "contextColumns": ["nace", "isco"],
   "outputs": [
     {

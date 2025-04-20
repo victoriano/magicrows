@@ -49,6 +49,11 @@ export const AIEnrichmentBlockSchema = {
         "description": "How to structure output: as new columns or new rows",
         "enum": ["newColumns", "newRows"]
       },
+      "combineOutputs": {
+        "type": "boolean",
+        "description": "If true, combine all outputs for a row into a single provider request using a merged JSON schema",
+        "default": false
+      },
       "contextColumns": {
         "type": "array",
         "description": "Dataset columns to include as context",
@@ -151,6 +156,8 @@ export const AIEnrichmentBlockSchema = {
     previewRowCount?: number;
     /** How to structure the output */
     outputFormat: "newColumns" | "newRows";
+    /** If true, combine all outputs for a row into a single provider request using a merged JSON schema */
+    combineOutputs?: boolean;
     /** Dataset columns to include as context */
     contextColumns?: string[];
     /** Output column configurations */

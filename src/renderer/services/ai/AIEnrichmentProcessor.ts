@@ -164,15 +164,17 @@ export class AIEnrichmentProcessor {
     config: AIEnrichmentBlockConfig,
     provider: any
   ): Promise<RowProcessingResult> {
+    if (config.combineOutputs) {
+      return this.processRowCombined(rowContext, config, provider);
+    }
+
     const outputs: OutputProcessingResult[] = [];
     
     // Process each output configuration
     for (const outputConfig of config.outputs) {
       try {
-        // Generate the prompt by substituting row data
         const prompt = this.generatePrompt(outputConfig.prompt, rowContext);
         
-        // Call the AI provider
         const options: ProcessPromptOptions = {
           model: config.model,
           temperature: config.temperature || 0.2,
@@ -181,25 +183,23 @@ export class AIEnrichmentProcessor {
           outputCardinality: outputConfig.outputCardinality
         };
         
-        // Auto‑attach JSON schema for multiple outputs
         if (outputConfig.outputCardinality === 'multiple') {
           if (outputConfig.outputType === 'number') {
             options.responseSchema = { type: 'array', items: { type: 'number' } };
-          } else if (outputConfig.outputType === 'category' && Array.isArray(outputConfig.outputCategories)) {
+          } else if (
+            outputConfig.outputType === 'category' &&
+            Array.isArray(outputConfig.outputCategories)
+          ) {
             options.responseSchema = {
               type: 'array',
               items: { type: 'string', enum: outputConfig.outputCategories.map(cat => cat.name) }
             };
           } else if (outputConfig.outputType === 'text') {
-            // Wrap array inside an object to satisfy OpenAI requirement that root is object
             options.responseSchema = {
               type: 'object',
               properties: {
                 reasoning: { type: 'string' },
-                items: {
-                  type: 'array',
-                  items: { type: 'string' }
-                }
+                items: { type: 'array', items: { type: 'string' } }
               },
               required: ['reasoning', 'items'],
               additionalProperties: false
@@ -613,5 +613,159 @@ export class AIEnrichmentProcessor {
     }
 
     return '';
+  }
+
+  // ----- Combined‑outputs branch -----
+
+  private async processRowCombined(
+    rowContext: DataRowContext,
+    config: AIEnrichmentBlockConfig,
+    provider: any
+  ): Promise<RowProcessingResult> {
+    const combinedPrompt = this.buildCombinedPrompt(rowContext, config);
+    const combinedSchema = this.buildCombinedSchema(config);
+
+    const options: ProcessPromptOptions = {
+      model: config.model,
+      temperature: config.temperature || 0.2,
+      outputType: 'text', // placeholder; combined schema defines exact types
+      responseSchema: combinedSchema
+    };
+
+    let aiResp: AIModelResponse;
+    try {
+      aiResp = await provider.processPrompt(combinedPrompt, options);
+    } catch (err) {
+      return { rowIndex: rowContext.rowIndex, outputs: [], error: String(err) };
+    }
+
+    const structured = (aiResp.structuredData ?? {}) as Record<string, any>;
+
+    const outputs: OutputProcessingResult[] = config.outputs.map(outputConfig => {
+      const chunk = structured[outputConfig.name] ?? {};
+
+      const resp: AIModelResponse = {
+        structuredData: chunk,
+        reasoning: chunk.reasoning,
+        category: chunk.category,
+        text: chunk.text,
+        items: chunk.items,
+        number: chunk.number,
+        url: chunk.url,
+        date: chunk.date
+      };
+
+      return {
+        outputName: outputConfig.name,
+        outputType: outputConfig.outputType,
+        outputCardinality: outputConfig.outputCardinality,
+        response: resp
+      };
+    });
+
+    return { rowIndex: rowContext.rowIndex, outputs };
+  }
+
+  private buildCombinedPrompt(rowContext: DataRowContext, config: AIEnrichmentBlockConfig): string {
+    const sections = config.outputs.map(o => {
+      const p = this.generatePrompt(o.prompt, rowContext);
+      return `### ${o.name}\n${p}`;
+    });
+    return sections.join('\n\n');
+  }
+
+  private buildCombinedSchema(config: AIEnrichmentBlockConfig): any {
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+
+    config.outputs.forEach(o => {
+      required.push(o.name);
+
+      if (o.outputType === 'category') {
+        const enumVals = o.outputCategories?.map(c => c.name);
+        properties[o.name] = {
+          type: 'object',
+          properties: {
+            reasoning: { type: 'string' },
+            category: enumVals ? { type: 'string', enum: enumVals } : { type: 'string' }
+          },
+          required: ['reasoning', 'category'],
+          additionalProperties: false
+        };
+      } else if (o.outputType === 'number') {
+        if (o.outputCardinality === 'multiple') {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              items: { type: 'array', items: { type: 'number' } }
+            },
+            required: ['reasoning', 'items'],
+            additionalProperties: false
+          };
+        } else {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              number: { type: 'number' }
+            },
+            required: ['reasoning', 'number'],
+            additionalProperties: false
+          };
+        }
+      } else if (o.outputType === 'text') {
+        if (o.outputCardinality === 'multiple') {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              items: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['reasoning', 'items'],
+            additionalProperties: false
+          };
+        } else {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              text: { type: 'string' }
+            },
+            required: ['reasoning', 'text'],
+            additionalProperties: false
+          };
+        }
+      } else if (o.outputType === 'url') {
+        properties[o.name] = {
+          type: 'object',
+          properties: {
+            reasoning: { type: 'string' },
+            url: { type: 'string', format: 'uri' }
+          },
+          required: ['reasoning', 'url'],
+          additionalProperties: false
+        };
+      } else if (o.outputType === 'date') {
+        properties[o.name] = {
+          type: 'object',
+          properties: {
+            reasoning: { type: 'string' },
+            date: { type: 'string', format: 'date' }
+          },
+          required: ['reasoning', 'date'],
+          additionalProperties: false
+        };
+      } else {
+        properties[o.name] = { type: 'object', additionalProperties: true };
+      }
+    });
+
+    return {
+      type: 'object',
+      properties,
+      required,
+      additionalProperties: false
+    };
   }
 }

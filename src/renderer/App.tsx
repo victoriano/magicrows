@@ -1043,10 +1043,6 @@ const App: React.FC = () => {
                         {currentFileName && `Current file: ${currentFileName}`}
                       </p>
                     </div>
-                    <div className="space-x-2">
-                      <button className="btn btn-primary" onClick={() => document.getElementById('enrichment-process-btn')?.click()}>Process</button>
-                      <button className="btn btn-ghost" onClick={handleExportCsv}>Export</button>
-                    </div>
                   </div>
 
                   {/* AI Enrichment Panel */}

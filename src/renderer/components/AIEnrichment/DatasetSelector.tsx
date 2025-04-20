@@ -17,10 +17,6 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
     status
   } = useAIEnrichment();
 
-  if (!hasEnrichedData) {
-    return null;
-  }
-
   const isProcessing = status === 'processing';
 
   return (
@@ -31,14 +27,14 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
           <button
             className={`btn btn-sm ${!isShowingEnrichedData ? 'btn-active' : ''}`}
             onClick={() => setActiveDataset('original')}
-            disabled={isProcessing}
+            disabled={isProcessing || !hasEnrichedData}
           >
             Original
           </button>
           <button
             className={`btn btn-sm ${isShowingEnrichedData ? 'btn-active' : ''}`}
             onClick={() => setActiveDataset('enriched')}
-            disabled={isProcessing}
+            disabled={isProcessing || !hasEnrichedData}
           >
             Enriched
           </button>
@@ -55,10 +51,10 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
         )}
       </div>
       
-      {/* Export button added here */}
+      {/* Export button always shown */}
       {onExport && (
         <button 
-          className="btn btn-primary btn-sm"
+          className="btn btn-primary"
           onClick={onExport}
           disabled={isProcessing}
         >

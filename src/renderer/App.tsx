@@ -1,5 +1,6 @@
 import React, { useState, useLayoutEffect, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import type { ElectronAPI } from './types/electron';
 import { 
   addProvider, 
   updateProvider, 
@@ -15,11 +16,10 @@ import { RootState, AppDispatch, persistor } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
 import { loadExternalPresets } from './store/slices/aiEnrichmentSlice';
 import Papa from 'papaparse';
+// @ts-ignore - This file exists at runtime, ignore TypeScript error
+import magicRowsLogo from '../assets/magicrows_logo.png';
 // Import AI Enrichment components
 import { AIEnrichmentSelector, DatasetSelector, ProcessingStatusIndicator } from './components/AIEnrichment';
-
-// Import the logo image directly - this ensures Vite will process it correctly
-import magicRowsLogo from '../assets/magicrows_logo.png';
 
 // Define the provider type
 interface Provider {
@@ -28,29 +28,6 @@ interface Provider {
   type: string;
   isActive: boolean;
   apiKey: string;
-}
-
-// Type declaration for window.electronAPI
-declare global {
-  interface Window {
-    electronAPI: {
-      openFile: () => Promise<string | null>;
-      saveFile: () => Promise<string | null>;
-      selectDirectory: () => Promise<string | null>;
-      readFile: (path: string) => Promise<string>;
-      writeFile: (path: string, content: string) => Promise<boolean>;
-      getApiKeys: () => Promise<{ openai?: string, perplexity?: string }>;
-      saveApiKeys: (keys: { openai?: string, perplexity?: string }) => Promise<boolean>;
-      restart: () => Promise<void>;
-      getAppInfo: () => Promise<{ version: string, platform: string }>;
-      secureStorage: {
-        getApiKey: (providerId: string) => Promise<string>;
-        setApiKey: (providerId: string, apiKey: string) => Promise<boolean>;
-        deleteApiKey: (providerId: string) => Promise<boolean>;
-        hasApiKey: (providerId: string) => Promise<boolean>;
-      };
-    };
-  }
 }
 
 const App: React.FC = () => {
@@ -74,8 +51,8 @@ const App: React.FC = () => {
   
   // Redux
   const dispatch = useDispatch<AppDispatch>();
-  const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data);
-  const providers = useSelector((state: RootState) => state.providers.providers);
+  const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data!);
+  const providers = useSelector((state: RootState) => state.providers?.providers || []);
   const aiEnrichment = useSelector((state: RootState) => state.aiEnrichment);
   
   // Memoize the data display selection based on the enrichment state
@@ -266,8 +243,8 @@ const App: React.FC = () => {
     if (selectedFile) {
       dispatch(setLoading(true));
       try {
-        // For testing, add a mock file path if it doesn't exist
-        const filePath = selectedFile.path || `/mock/path/${selectedFile.name}`;
+        // @ts-ignore – Electron adds .path when running in desktop app
+        const filePath = (selectedFile as any).path || `/mock/path/${selectedFile.name}`;
         
         Papa.parse(selectedFile, {
           complete: (results) => {
@@ -345,7 +322,10 @@ const App: React.FC = () => {
       getApiKeys: async () => ({}),
       saveApiKeys: async () => true,
       restart: async () => {},
-      getAppInfo: async () => ({ version: 'dev', platform: 'web' })
+      getAppInfo: async () => ({ version: 'dev', platform: 'web' }),
+      externalApi: {
+        call: async () => ({ ok: false, status: 404, statusText: 'Mock API not implemented' })
+      }
     };
   };
 
@@ -662,6 +642,35 @@ const App: React.FC = () => {
         console.error("Error resetting application state:", error);
         alert("Failed to reset application state. See console for details.");
       }
+    }
+  };
+
+  // Export CSV (original or enriched)
+  const handleExportCsv = async () => {
+    if (!csvData) return;
+
+    // Determine which dataset view is active
+    const rowsToExport = displayRows;
+    const headersToExport = displayHeaders;
+
+    if (!rowsToExport || rowsToExport.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const csvString = Papa.unparse({
+      fields: headersToExport,
+      data: rowsToExport
+    });
+
+    try {
+      const savePath = await window.electronAPI.saveFile();
+      if (savePath) {
+        await window.electronAPI.writeFile(savePath, csvString);
+        console.log('CSV exported to', savePath);
+      }
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
     }
   };
 
@@ -1035,8 +1044,8 @@ const App: React.FC = () => {
                       </p>
                     </div>
                     <div className="space-x-2">
-                      <button className="btn btn-primary">Process</button>
-                      <button className="btn btn-ghost">Export</button>
+                      <button className="btn btn-primary" onClick={() => document.getElementById('enrichment-process-btn')?.click()}>Process</button>
+                      <button className="btn btn-ghost" onClick={handleExportCsv}>Export</button>
                     </div>
                   </div>
 
@@ -1046,8 +1055,8 @@ const App: React.FC = () => {
                   {/* Processing Status Indicator */}
                   <ProcessingStatusIndicator />
                   
-                  {/* Dataset Selector */}
-                  <DatasetSelector />
+                  {/* Dataset Selector with Export button */}
+                  <DatasetSelector onExport={handleExportCsv} />
                   
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">

@@ -8,6 +8,8 @@ import { keywordExtractionPreset } from './keyword_extraction_preset';
 import { dataEnrichmentPreset } from './data_enrichment_preset';
 import { ISCONoveltyPreset } from './ISCONovelty_preset';
 import { ISCOTasksPreset } from './ISCOTasks_preset';
+import { ISCOPerplexityTasksPreset } from './ISCOTasksPerplexity_preset';
+import { ISCOPerplexityNoveltyPreset } from './ISCONoveltyPerplexity_preset';
 import { EnrichmentPreset } from '../../renderer/store/slices/aiEnrichmentSlice';
 
 /**
@@ -19,7 +21,9 @@ export const allPresets: EnrichmentPreset[] = [
   keywordExtractionPreset,
   dataEnrichmentPreset,
   ISCONoveltyPreset,
-  ISCOTasksPreset
+  ISCOTasksPreset,
+  ISCOPerplexityNoveltyPreset,
+  ISCOPerplexityTasksPreset
 ];
 
 // Also individually export the presets for direct imports where needed

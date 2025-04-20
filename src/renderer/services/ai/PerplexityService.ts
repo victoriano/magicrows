@@ -88,9 +88,15 @@ export class PerplexityService extends BaseAIProvider {
       
       console.log(`Using Perplexity API endpoint: ${apiEndpoint}`);
 
-      // Create the request body according to Perplexity API specifications
+      // ---------------------------------------------
+      // Structured output support (JSON Schema)
+      // ---------------------------------------------
+
+      const useStructuredOutput = this.shouldUseStructuredOutput(options);
+
+      // Build request body according to Perplexity API specifications
       // https://docs.perplexity.ai/api-reference/chat-completions
-      const requestBody = {
+      const requestBody: any = {
         model: options.model || 'sonar', // Default to sonar if not specified
         messages,
         temperature: options.temperature ?? 0.2,
@@ -100,6 +106,26 @@ export class PerplexityService extends BaseAIProvider {
         presence_penalty: 0,
         frequency_penalty: 0
       };
+
+      if (useStructuredOutput) {
+        // Build or use provided schema
+        const schema = options.responseSchema || this.generateOutputSchema(options);
+
+        if (schema && schema.type === 'object' && schema.additionalProperties === undefined) {
+          schema.additionalProperties = false;
+        }
+
+        const responseFormat = {
+          type: 'json_schema',
+          json_schema: {
+            name: options.providerOptions?.schemaName || 'structured_output',
+            schema,
+            strict: true
+          }
+        } as const;
+
+        requestBody.response_format = responseFormat;
+      }
 
       // Log the request details (excluding sensitive info)
       console.log('Perplexity API Request:', {
@@ -152,6 +178,16 @@ export class PerplexityService extends BaseAIProvider {
         // Extract the response data
         const responseData = response.data;
         
+        // Handle structured JSON output when requested
+        if (useStructuredOutput && responseData?.choices?.[0]?.message?.content) {
+          try {
+            const structured = JSON.parse(responseData.choices[0].message.content);
+            return { structuredData: structured };
+          } catch {
+            // fallthrough to normal parsing
+          }
+        }
+
         // Validate the response structure
         if (!responseData || !responseData.choices || !responseData.choices[0]) {
           throw new Error('Invalid response from Perplexity API: Missing choices');
@@ -160,21 +196,18 @@ export class PerplexityService extends BaseAIProvider {
         // Extract the response content based on the output type
         switch (options.outputType) {
           case 'text':
-            return {
-              text: responseData.choices?.[0]?.message?.content || '',
-              error: undefined
-            };
-          case 'categories':
-            return this.processCategoriesResponse(responseData, options);
-          case 'singleCategory':
+            return { text: responseData.choices?.[0]?.message?.content || '' };
+          case 'category':
+            if (options.outputCardinality === 'multiple') {
+              return this.processCategoriesResponse(responseData, options);
+            }
             return this.processSingleCategoryResponse(responseData, options);
           case 'number':
             return this.processNumberResponse(responseData);
+          case 'url':
+          case 'date':
           default:
-            return {
-              text: responseData.choices?.[0]?.message?.content || '',
-              error: undefined
-            };
+            return { text: responseData.choices?.[0]?.message?.content || '' };
         }
       } catch (error) {
         console.error('Error processing prompt with Perplexity:', error);
@@ -288,16 +321,16 @@ export class PerplexityService extends BaseAIProvider {
         systemMessage += 'Provide a clear, concise text response.';
         break;
         
-      case 'categories':
-        systemMessage += `Choose multiple categories from the following options: ${
-          options.outputCategories?.map(c => c.name).join(', ') || 'No categories provided'
-        }. Format your response as a comma-separated list without any additional text.`;
-        break;
-        
-      case 'singleCategory':
-        systemMessage += `Choose exactly one category from the following options: ${
-          options.outputCategories?.map(c => c.name).join(', ') || 'No categories provided'
-        }. Respond with only the chosen category name, without any additional text.`;
+      case 'category':
+        if (options.outputCardinality === 'multiple') {
+          systemMessage += `Choose multiple categories from the following options: ${
+            options.outputCategories?.map(c => c.name).join(', ') || 'No categories provided'
+          }. Format your response as a comma-separated list without any additional text.`;
+        } else {
+          systemMessage += `Choose exactly one category from the following options: ${
+            options.outputCategories?.map(c => c.name).join(', ') || 'No categories provided'
+          }. Respond with only the chosen category name, without any additional text.`;
+        }
         break;
         
       case 'number':
@@ -338,58 +371,28 @@ export class PerplexityService extends BaseAIProvider {
         case 'text':
           return { text: cleanedContent };
           
-        case 'singleCategory': {
-          // If categories are provided, validate the response
+        case 'category': {
           if (outputCategories && outputCategories.length > 0) {
             const categoryNames = outputCategories.map(c => c.name);
-            // Find the first matching category (case-insensitive)
-            const matchedCategory = categoryNames.find(
-              name => cleanedContent.toLowerCase() === name.toLowerCase()
-            );
-            
-            if (matchedCategory) {
-              return { category: matchedCategory };
-            } else {
-              // Best effort: try to find the category in the response
-              for (const category of categoryNames) {
-                if (cleanedContent.toLowerCase().includes(category.toLowerCase())) {
-                  return { category };
-                }
-              }
-              return { 
-                category: categoryNames[0], 
-                error: 'Could not match response to any category' 
-              };
+            if (outputCategories && cleanedContent.includes(',')) {
+              // split CSV
+              const cats = cleanedContent
+                .split(',')
+                .map(c => c.trim())
+                .filter(Boolean);
+              const valid = cats.filter(cat => categoryNames.some(name => cat.toLowerCase() === name.toLowerCase()));
+              return { categories: valid.length ? valid : cats };
             }
+            // single
+            const matched = categoryNames.find(name => cleanedContent.toLowerCase() === name.toLowerCase());
+            return { category: matched || cleanedContent };
+          }
+          // no category list provided
+          if (cleanedContent.includes(',')) {
+            const cats = cleanedContent.split(',').map(c => c.trim()).filter(Boolean);
+            return { categories: cats };
           }
           return { category: cleanedContent };
-        }
-          
-        case 'categories': {
-          // Split by commas and clean up each item
-          const categories = cleanedContent
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean);
-            
-          // If categories are provided, validate each response item
-          if (outputCategories && outputCategories.length > 0) {
-            const categoryNames = outputCategories.map(c => c.name);
-            const validCategories = categories.filter(cat => 
-              categoryNames.some(name => cat.toLowerCase() === name.toLowerCase())
-            );
-            
-            if (validCategories.length > 0) {
-              return { categories: validCategories };
-            } else {
-              return { 
-                categories: [], 
-                error: 'Could not match response to any categories' 
-              };
-            }
-          }
-          
-          return { categories };
         }
           
         case 'number': {
@@ -428,6 +431,74 @@ export class PerplexityService extends BaseAIProvider {
         error: `Error parsing response: ${error instanceof Error ? error.message : 'Unknown error'}` 
       };
     }
+  }
+
+  // -----------------------------------------------------
+  // Structured‑output helpers copied from OpenAIService
+  // -----------------------------------------------------
+
+  /** Determine if JSON‑schema structured output should be used */
+  private shouldUseStructuredOutput(options: ProcessPromptOptions): boolean {
+    return (
+      options.responseSchema !== undefined ||
+      (options.outputType === 'category' &&
+        Array.isArray(options.outputCategories) &&
+        options.outputCategories.length > 0)
+    );
+  }
+
+  /** Generate default output schema identical to OpenAIService implementation */
+  private generateOutputSchema(options: ProcessPromptOptions): any {
+    // Basic schema generator simplified – if more types needed copy full logic from OpenAIService
+    if (options.outputType === 'category') {
+      if (options.outputCardinality === 'multiple') {
+        return {
+          type: 'object',
+          properties: {
+            reasoning: { type: 'string' },
+            categories: {
+              type: 'array',
+              items: options.outputCategories
+                ? { type: 'string', enum: options.outputCategories.map(c => c.name) }
+                : { type: 'string' }
+            }
+          },
+          required: ['reasoning', 'categories'],
+          additionalProperties: false
+        };
+      }
+      return {
+        type: 'object',
+        properties: {
+          reasoning: { type: 'string' },
+          category: options.outputCategories
+            ? { type: 'string', enum: options.outputCategories.map(c => c.name) }
+            : { type: 'string' }
+        },
+        required: ['reasoning', 'category'],
+        additionalProperties: false
+      };
+    }
+    if (options.outputType === 'text' && options.outputCardinality === 'multiple') {
+      return {
+        type: 'object',
+        properties: {
+          reasoning: { type: 'string' },
+          items: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['reasoning', 'items'],
+        additionalProperties: false
+      };
+    }
+    // fallback simple schema
+    return {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        reasoning: { type: 'string' }
+      },
+      required: ['text', 'reasoning']
+    };
   }
 }
 

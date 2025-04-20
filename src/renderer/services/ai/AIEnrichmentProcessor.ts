@@ -510,39 +510,47 @@ export class AIEnrichmentProcessor {
         outputsByName.set(output.outputName, output);
       });
       
-      // Create a new row with all the values
-      const newRow = [...originalRow];
-      
-      // Add values for each output field
-      outputFields.forEach(fieldName => {
-        const output = outputsByName.get(fieldName);
-        if (output) {
-          newRow.push(this.formatOutputValue(output.response));
-        } else {
-          newRow.push(''); // Empty cell for missing output
+      // Determine how many sub‑rows we need (max length across multi outputs)
+      let subRowCount = 1;
+      outputsByName.forEach(o => {
+        if (o.outputCardinality === 'multiple' && Array.isArray(o.response.items)) {
+          subRowCount = Math.max(subRowCount, o.response.items.length);
         }
       });
-      
-      // Add values for each reasoning field
-      outputReasoningFields.forEach(reasoningField => {
-        const fieldName = reasoningField.replace('_reasoning', '');
-        const output = outputsByName.get(fieldName);
-        
-        console.log(`Extracting reasoning for ${fieldName}:`, output?.response);
-        
-        // Check for reasoning directly in the response
-        if (output && output.response.reasoning) {
-          console.log(`Found direct reasoning: ${output.response.reasoning}`);
-          newRow.push(output.response.reasoning);
-        } 
-        // Check for reasoning in the structuredData
-        else if (output && output.response.structuredData && output.response.structuredData.reasoning) {
-          console.log(`Found reasoning in structuredData: ${output.response.structuredData.reasoning}`);
-          newRow.push(output.response.structuredData.reasoning);
-        }
-      });
-      
-      newRows.push(newRow);
+
+      for (let idx = 0; idx < subRowCount; idx++) {
+        const newRow: string[] = [...originalRow];
+
+        // Add values for each output field
+        outputFields.forEach(fieldName => {
+          const output = outputsByName.get(fieldName);
+          if (!output) {
+            newRow.push('');
+            return;
+          }
+
+          if (output.outputCardinality === 'multiple' && Array.isArray(output.response.items)) {
+            newRow.push(output.response.items[idx] !== undefined ? String(output.response.items[idx]) : '');
+          } else {
+            // single value – only populate on first sub‑row
+            newRow.push(idx === 0 ? this.formatOutputValue(output.response) : '');
+          }
+        });
+
+        // Add reasoning columns (repeat reasoning even for sub‑rows)
+        outputReasoningFields.forEach(reasoningField => {
+          const fieldName = reasoningField.replace('_reasoning', '');
+          const output = outputsByName.get(fieldName);
+          if (!output) {
+            newRow.push('');
+            return;
+          }
+          const reasoning = output.response.reasoning ?? output.response.structuredData?.reasoning ?? '';
+          newRow.push(reasoning);
+        });
+
+        newRows.push(newRow);
+      }
     });
 
     return {

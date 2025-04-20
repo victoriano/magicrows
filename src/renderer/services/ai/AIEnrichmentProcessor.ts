@@ -185,14 +185,30 @@ export class AIEnrichmentProcessor {
         
         if (outputConfig.outputCardinality === 'multiple') {
           if (outputConfig.outputType === 'number') {
-            options.responseSchema = { type: 'array', items: { type: 'number' } };
+            options.responseSchema = {
+              type: 'object',
+              properties: {
+                reasoning: { type: 'string' },
+                items: { type: 'array', items: { type: 'number' } }
+              },
+              required: ['reasoning', 'items'],
+              additionalProperties: false
+            };
           } else if (
             outputConfig.outputType === 'category' &&
             Array.isArray(outputConfig.outputCategories)
           ) {
             options.responseSchema = {
-              type: 'array',
-              items: { type: 'string', enum: outputConfig.outputCategories.map(cat => cat.name) }
+              type: 'object',
+              properties: {
+                reasoning: { type: 'string' },
+                categories: {
+                  type: 'array',
+                  items: { type: 'string', enum: outputConfig.outputCategories.map(cat => cat.name) }
+                }
+              },
+              required: ['reasoning', 'categories'],
+              additionalProperties: false
             };
           } else if (outputConfig.outputType === 'text') {
             options.responseSchema = {
@@ -578,6 +594,10 @@ export class AIEnrichmentProcessor {
       return Array.isArray(response.items) ? JSON.stringify(response.items) : String(response.items);
     }
 
+    if (response.categories !== undefined) {
+      return response.categories.join(', ');
+    }
+
     if (response.structuredData) {
       if (response.structuredData.text && Array.isArray(response.structuredData.text)) {
         return JSON.stringify(response.structuredData.text);
@@ -598,10 +618,6 @@ export class AIEnrichmentProcessor {
 
     if (response.number !== undefined) {
       return response.number.toString();
-    }
-
-    if (response.categories !== undefined) {
-      return response.categories.join(', ');
     }
 
     if (response.url !== undefined) {

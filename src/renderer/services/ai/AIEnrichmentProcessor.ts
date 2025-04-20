@@ -190,6 +190,19 @@ export class AIEnrichmentProcessor {
               type: 'array',
               items: { type: 'string', enum: outputConfig.outputCategories.map(cat => cat.name) }
             };
+          } else if (outputConfig.outputType === 'text') {
+            // Wrap array inside an object to satisfy OpenAI requirement that root is object
+            options.responseSchema = {
+              type: 'object',
+              properties: {
+                items: {
+                  type: 'array',
+                  items: { type: 'string' }
+                }
+              },
+              required: ['items'],
+              additionalProperties: false
+            };
           } else {
             options.responseSchema = { type: 'array', items: { type: 'string' } };
           }

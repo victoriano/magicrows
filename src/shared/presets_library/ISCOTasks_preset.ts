@@ -22,8 +22,8 @@ export const ISCOtasksConfig: AIEnrichmentBlockConfig = {
       "outputCardinality": "multiple"
     },
     {
-      "name": "best_country_match",
-      "prompt": "Based on the industry sector with NACE code {{nace}} and occupation with ISCO code {{isco}}, analyze which of the following European countries have the strongest and most advanced industry in this specific sector and occupation. Consider factors like technological advancement, market leadership, innovation, workforce expertise, and industry presence. Select the most appropriate country and reason base on specific companies names that are strong for thase countries in tha industry",
+      "name": "best_countries_match",
+      "prompt": "Based on the industry sector with NACE code {{nace}} and occupation with ISCO code {{isco}}, analyze which of the following European countries have the strongest and most advanced industry in this specific sector and occupation. Consider factors like technological advancement, market leadership, innovation, workforce expertise, and industry presence. Select 1-3 most appropriate countries and provide reasoning based on specific company names that are strong in those countries in this industry",
       "outputType": "category",
       "outputCardinality": "multiple",
       "outputCategories": [

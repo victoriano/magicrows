@@ -52,7 +52,7 @@ export const AIEnrichmentBlockSchema = {
       "combineOutputs": {
         "type": "boolean",
         "description": "If true, combine all outputs for a row into a single provider request using a merged JSON schema",
-        "default": false
+        "default": true
       },
       "contextColumns": {
         "type": "array",

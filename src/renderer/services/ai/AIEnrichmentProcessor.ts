@@ -164,7 +164,7 @@ export class AIEnrichmentProcessor {
     config: AIEnrichmentBlockConfig,
     provider: any
   ): Promise<RowProcessingResult> {
-    if (config.combineOutputs) {
+    if (config.combineOutputs !== false) {
       return this.processRowCombined(rowContext, config, provider);
     }
 
@@ -532,8 +532,8 @@ export class AIEnrichmentProcessor {
           if (output.outputCardinality === 'multiple' && Array.isArray(output.response.items)) {
             newRow.push(output.response.items[idx] !== undefined ? String(output.response.items[idx]) : '');
           } else {
-            // single value – only populate on first sub‑row
-            newRow.push(idx === 0 ? this.formatOutputValue(output.response) : '');
+            // single value – repeat across all sub‑rows for consistency
+            newRow.push(this.formatOutputValue(output.response));
           }
         });
 

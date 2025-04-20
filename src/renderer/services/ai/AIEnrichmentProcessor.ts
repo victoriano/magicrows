@@ -195,12 +195,13 @@ export class AIEnrichmentProcessor {
             options.responseSchema = {
               type: 'object',
               properties: {
+                reasoning: { type: 'string' },
                 items: {
                   type: 'array',
                   items: { type: 'string' }
                 }
               },
-              required: ['items'],
+              required: ['reasoning', 'items'],
               additionalProperties: false
             };
           } else {
@@ -539,27 +540,11 @@ export class AIEnrichmentProcessor {
           console.log(`Found reasoning in structuredData: ${output.response.structuredData.reasoning}`);
           newRow.push(output.response.structuredData.reasoning);
         }
-        // Special case for the format we're seeing in the output with tasks array
-        else if (output && output.response.structuredData && 
-                output.outputType === 'text' && output.outputCardinality === 'multiple') {
-          // Try to find reasoning in different places
-          const structuredData = output.response.structuredData;
-          if (structuredData.reasoning) {
-            console.log(`Found reasoning for tasks: ${structuredData.reasoning}`);
-            newRow.push(structuredData.reasoning);
-          } else {
-            console.log('No reasoning found for tasks');
-            newRow.push(''); // Empty cell for missing reasoning
-          }
-        } else {
-          console.log('No reasoning found');
-          newRow.push(''); // Empty cell for missing reasoning
-        }
       });
       
       newRows.push(newRow);
     });
-    
+
     return {
       newHeaders,
       newRows,
@@ -568,89 +553,57 @@ export class AIEnrichmentProcessor {
     };
   }
 
-  /**
-   * Format an output value based on its type
-   * @param response The AI model response
-   * @returns Formatted string value
-   */
   private formatOutputValue(response: AIModelResponse): string {
     if (response.error) {
       return `Error: ${response.error}`;
     }
-    
-    // For single category outputs, just return the category name
+
     if (response.category !== undefined) {
       return response.category;
     }
-    
-    // For text outputs
+
     if (response.text !== undefined) {
       return response.text;
     }
-    
-    // For multiple text items
+
     if (response.items !== undefined) {
-      // If we have items array directly, use it
-      if (Array.isArray(response.items)) {
-        return JSON.stringify(response.items);
-      }
-      
-      // Handle other potential formats
+      return Array.isArray(response.items) ? JSON.stringify(response.items) : String(response.items);
     }
-    
-    // Handle the case where we get a structured response with text field that contains an array
+
     if (response.structuredData) {
       if (response.structuredData.text && Array.isArray(response.structuredData.text)) {
         return JSON.stringify(response.structuredData.text);
       }
-      
-      // Handle the "tasks" array format we're seeing in the output
       if (response.structuredData.tasks && Array.isArray(response.structuredData.tasks)) {
         return JSON.stringify(response.structuredData.tasks);
       }
-      
-      // Special case for the format we're seeing in the output
-      if (response.structuredData.reasoning && response.structuredData.text) {
-        return JSON.stringify(response.structuredData.text);
+      if (response.structuredData.response) {
+        return String(response.structuredData.response);
+      }
+      try {
+        const jsonStr = JSON.stringify(response.structuredData);
+        return jsonStr.length > 80 ? jsonStr.substring(0, 77) + '…' : jsonStr;
+      } catch {
+        return String(response.structuredData);
       }
     }
-    
-    // For number outputs
+
     if (response.number !== undefined) {
       return response.number.toString();
     }
-    
-    // For multiple categories
+
     if (response.categories !== undefined) {
       return response.categories.join(', ');
     }
-    
-    // For URL outputs
+
     if (response.url !== undefined) {
       return response.url;
     }
-    
-    // For date outputs
+
     if (response.date !== undefined) {
       return response.date;
     }
-    
-    // For structured data without any specific field extraction
-    if (response.structuredData !== undefined) {
-      try {
-        // First try to just use the "response" field if it exists
-        if (response.structuredData.response) {
-          return response.structuredData.response;
-        }
-        
-        // If no specific response field, use a stringified version but truncated for readability
-        const jsonStr = JSON.stringify(response.structuredData);
-        return jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
-      } catch (e) {
-        return JSON.stringify(response.structuredData);
-      }
-    }
-    
+
     return '';
   }
 }

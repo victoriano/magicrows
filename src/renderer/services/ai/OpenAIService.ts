@@ -436,19 +436,27 @@ export class OpenAIService extends BaseAIProvider {
       console.log('✅ Generated date schema');
     }
     else if (options.outputType === 'text' && options.outputCardinality === 'multiple') {
-      console.log('🔍 Generating schema for multiple text items');
-      
-      // For multiple text items, we want just an array of strings without reasoning
-      // The reasoning will be handled separately by the AIEnrichmentProcessor
+      console.log('🔍 Generating schema for multiple text items WITH reasoning');
+
+      // Wrap list in object so we can attach reasoning as sibling field
       schema = {
-        type: "array",
-        items: {
-          type: "string"
+        type: "object",
+        properties: {
+          reasoning: {
+            type: "string",
+            description: "Explanation of why these items were selected or generated"
+          },
+          items: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of text items"
+          }
         },
-        description: "Array of text items"
+        required: ["reasoning", "items"],
+        additionalProperties: false
       };
-      
-      console.log('✅ Generated multiple text items schema');
+
+      console.log('✅ Generated multiple text items schema (object with items + reasoning)');
     }
     else {
       console.log('ℹ️ Using default text schema for output type:', options.outputType);
@@ -600,7 +608,7 @@ export class OpenAIService extends BaseAIProvider {
         systemMessage += 'First provide your reasoning, then provide a date response as a simple JSON object with a "reasoning" field explaining your choice, and a "date" field in ISO format (YYYY-MM-DD). Do not nest the response or add any other fields.';
       } else if (options.outputType === 'text') {
         if (options.outputCardinality === 'multiple') {
-          systemMessage += 'Provide an array of text items in JSON format. Each item should be a string in the array. Do not include any explanation or reasoning in the response - that will be handled separately.';
+          systemMessage += 'First provide your reasoning, then provide an array of text items in JSON format as the "items" field of an object, with the "reasoning" field explaining your choices. Respond exactly as a JSON object with keys "reasoning" and "items" and no other fields.';
         } else {
           systemMessage += 'First provide your reasoning, then provide a text response as a simple JSON object with a "reasoning" field explaining your response, and a "text" field. Do not nest the response or add any other fields.';
         }

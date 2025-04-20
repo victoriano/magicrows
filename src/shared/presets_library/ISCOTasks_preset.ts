@@ -11,8 +11,7 @@ export const ISCOtasksConfig: AIEnrichmentBlockConfig = {
   "temperature": 0.2,
   "mode": "preview",
   "previewRowCount": 2,
-  "outputFormat": "newColumns",
-  "combineOutputs": false,
+  "outputFormat": "newRows",
   "contextColumns": ["nace", "isco"],
   "outputs": [
     {

@@ -595,7 +595,7 @@ export class AIEnrichmentProcessor {
     }
 
     if (response.categories !== undefined) {
-      return response.categories.join(', ');
+      return JSON.stringify(response.categories);
     }
 
     if (response.structuredData) {
@@ -666,6 +666,7 @@ export class AIEnrichmentProcessor {
         category: chunk.category,
         text: chunk.text,
         items: chunk.items,
+        categories: chunk.categories,
         number: chunk.number,
         url: chunk.url,
         date: chunk.date
@@ -699,15 +700,30 @@ export class AIEnrichmentProcessor {
 
       if (o.outputType === 'category') {
         const enumVals = o.outputCategories?.map(c => c.name);
-        properties[o.name] = {
-          type: 'object',
-          properties: {
-            reasoning: { type: 'string' },
-            category: enumVals ? { type: 'string', enum: enumVals } : { type: 'string' }
-          },
-          required: ['reasoning', 'category'],
-          additionalProperties: false
-        };
+        if (o.outputCardinality === 'multiple') {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              categories: {
+                type: 'array',
+                items: enumVals ? { type: 'string', enum: enumVals } : { type: 'string' }
+              }
+            },
+            required: ['reasoning', 'categories'],
+            additionalProperties: false
+          };
+        } else {
+          properties[o.name] = {
+            type: 'object',
+            properties: {
+              reasoning: { type: 'string' },
+              category: enumVals ? { type: 'string', enum: enumVals } : { type: 'string' }
+            },
+            required: ['reasoning', 'category'],
+            additionalProperties: false
+          };
+        }
       } else if (o.outputType === 'number') {
         if (o.outputCardinality === 'multiple') {
           properties[o.name] = {

@@ -1009,21 +1009,28 @@ const App: React.FC = () => {
                     </div>
                     <div className="border-t border-gray-200 pt-4 mt-2">
                       <h4 className="text-sm font-medium mb-2">Maintenance</h4>
-                      <button 
-                        onClick={handleResetState}
-                        className="btn btn-error btn-sm w-full"
-                      >
-                        Reset Application State
-                      </button>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Resets all saved settings and configurations. Use this if you experience issues with outdated model configurations.
-                      </p>
+                      <div className="collapse collapse-plus border border-base-300 bg-base-100 rounded-md">
+                        <input type="checkbox" /> 
+                        <div className="collapse-title text-sm font-medium py-2">
+                          Advanced Maintenance Options
+                        </div>
+                        <div className="collapse-content"> 
+                          <div className="pt-2 pb-1">
+                            <button 
+                              onClick={handleResetState}
+                              className="btn btn-error btn-sm w-full"
+                            >
+                              Reset Application State
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Resets all saved settings and configurations. Use this if you experience issues with outdated model configurations.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex justify-end mt-6">
-                <button className="btn btn-primary">Save Settings</button>
               </div>
             </div>
           </div>

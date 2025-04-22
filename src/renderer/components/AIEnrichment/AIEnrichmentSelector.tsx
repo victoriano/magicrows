@@ -58,7 +58,8 @@ const AIEnrichmentSelector: React.FC = () => {
         // If no exact match, try to find a provider of the same type
         const providerType = getProviderTypeFromIntegration(selectedPreset.config.integrationName);
         if (providerType) {
-          const matchingTypeProvider = providers.find(p => p.type === providerType && p.isActive);
+          // Find any provider matching the type
+          const matchingTypeProvider = providers.find(p => p.type === providerType);
           
           if (matchingTypeProvider) {
             setSelectedProviderId(matchingTypeProvider.id);
@@ -72,15 +73,8 @@ const AIEnrichmentSelector: React.FC = () => {
       // If no matching provider or no integration name specified,
       // select the first available provider as default
       if (providers.length > 0) {
-        // Prioritize active providers
-        const activeProvider = providers.find(p => p.isActive);
-        if (activeProvider) {
-          setSelectedProviderId(activeProvider.id);
-          setProviderError(null);
-        } else {
-          setSelectedProviderId(providers[0].id);
-          setProviderError("Warning: Selected provider may not be configured properly.");
-        }
+        setSelectedProviderId(providers[0].id);
+        setProviderError(null);
       } else {
         setProviderError("No AI providers available. Add a provider in Settings.");
         setSelectedProviderId(null);

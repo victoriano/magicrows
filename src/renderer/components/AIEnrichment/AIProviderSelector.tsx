@@ -69,10 +69,9 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
     setShowDropdown(false);
   };
 
-  // Get provider status - active and has API key
-  const getProviderStatus = (provider: Provider): { isActive: boolean, hasApiKey: boolean } => {
+  // Get provider status - only track if it has API key
+  const getProviderStatus = (provider: Provider): { hasApiKey: boolean } => {
     return {
-      isActive: provider.isActive,
       hasApiKey: apiKeyStatus[provider.id] || false
     };
   };
@@ -110,13 +109,6 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
                   <span className="font-medium">{selectedProvider.name}</span>
                   <span className="ml-2 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
                     {selectedProvider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
-                  </span>
-                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                    selectedProvider.isActive 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {selectedProvider.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </>
               ) : (
@@ -161,18 +153,11 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
                       <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
                         {provider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
                       </span>
-                      <span className={`px-2 py-0.5 text-xs rounded-full ${
-                        provider.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {provider.isActive ? 'Active' : 'Inactive'}
-                      </span>
                     </div>
                     
                     <div className="text-xs mt-1 text-gray-500">
                       {status.hasApiKey 
-                        ? 'API key is set and the integration is active.' 
+                        ? 'API key is set.' 
                         : 'No API key set. Click Edit to add your key.'}
                     </div>
                   </div>

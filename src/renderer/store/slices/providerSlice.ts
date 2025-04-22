@@ -5,7 +5,6 @@ export interface Provider {
   id: string;
   name: string;
   type: string; // 'openai', 'perplexity', etc.
-  isActive: boolean;
   // Add a unique display ID to prevent React key issues
   uniqueId?: string;
 }
@@ -90,18 +89,6 @@ const providerSlice = createSlice({
       }
     },
     
-    // Update a provider's active status
-    setProviderActive: (
-      state, 
-      action: PayloadAction<{ id: string; isActive: boolean }>
-    ) => {
-      const { id, isActive } = action.payload;
-      const index = state.providers.findIndex(p => p.id === id);
-      if (index !== -1) {
-        state.providers[index].isActive = isActive;
-      }
-    },
-    
     // Remove a provider
     removeProvider: (state, action: PayloadAction<string>) => {
       state.providers = state.providers.filter(p => p.id !== action.payload);
@@ -116,34 +103,12 @@ const providerSlice = createSlice({
       }));
     }
   },
-  extraReducers: (builder) => {
-    // Handle async operation statuses if needed
-    builder
-      .addCase(saveProviderApiKey.fulfilled, (state, action) => {
-        if (action.payload && action.payload.success) {
-          // If API key was saved successfully, ensure the provider is active
-          const index = state.providers.findIndex(p => p.id === action.payload.providerId);
-          if (index !== -1) {
-            state.providers[index].isActive = true;
-          }
-        }
-      })
-      .addCase(deleteProviderApiKey.fulfilled, (state, action) => {
-        if (action.payload && action.payload.success) {
-          // If API key was deleted successfully, deactivate the provider
-          const index = state.providers.findIndex(p => p.id === action.payload.providerId);
-          if (index !== -1) {
-            state.providers[index].isActive = false;
-          }
-        }
-      });
-  }
+  extraReducers: () => {}
 });
 
 export const { 
   addProvider, 
   updateProvider, 
-  setProviderActive, 
   removeProvider,
   setProviders
 } = providerSlice.actions;

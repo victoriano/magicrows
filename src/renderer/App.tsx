@@ -5,7 +5,6 @@ import {
   addProvider, 
   updateProvider, 
   removeProvider, 
-  setProviderActive,
   Provider as ProviderType,
   saveProviderApiKey,
   deleteProviderApiKey,
@@ -26,7 +25,6 @@ interface Provider {
   id: string;
   name: string;
   type: string;
-  isActive: boolean;
   apiKey: string;
 }
 
@@ -400,24 +398,14 @@ const App: React.FC = () => {
             dispatch(updateProvider({ 
               id: editingProvider, 
               name: newProviderName,
-              type: provider.type,
-              isActive: provider.isActive
+              type: provider.type
             }));
           }
           
           // Save API key if provided
           if (editProviderApiKey.trim()) {
             const api = safelyAccessElectronAPI();
-            const success = await api.secureStorage.setApiKey(
-              editingProvider, 
-              editProviderApiKey
-            );
-            
-            if (success) {
-              console.log('API key updated successfully');
-            } else {
-              console.error('Failed to update API key');
-            }
+            await api.secureStorage.setApiKey(editingProvider, editProviderApiKey);
           }
         }
       } catch (error) {
@@ -456,8 +444,7 @@ const App: React.FC = () => {
         const newProvider = {
           id: newProviderId,
           name: newProviderName.trim(),
-          type: newProviderType,
-          isActive: providers.length === 0 // First provider is active by default
+          type: newProviderType
         };
         
         console.log('About to dispatch addProvider with:', JSON.stringify(newProvider));
@@ -467,16 +454,12 @@ const App: React.FC = () => {
         console.log('About to store API key securely...');
         try {
           const api = safelyAccessElectronAPI();
-          const success = await api.secureStorage.setApiKey(
+          await api.secureStorage.setApiKey(
             newProviderId,
             newProviderApiKey.trim()
           );
           
-          console.log('API key storage result:', success);
-          
-          if (!success) {
-            console.error('Failed to store API key - returned false');
-          }
+          console.log('API key storage result:', true);
         } catch (apiKeyError) {
           console.error('Error specifically when storing API key:', apiKeyError);
           throw apiKeyError; // Re-throw to be caught by the outer catch
@@ -548,11 +531,7 @@ const App: React.FC = () => {
     try {
       // Store the API key securely
       const api = safelyAccessElectronAPI();
-      const success = await api.secureStorage.setApiKey(providerId, apiKey);
-      if (success) {
-        // Update the provider's active status
-        dispatch(setProviderActive({ id: providerId, isActive: true }));
-      }
+      await api.secureStorage.setApiKey(providerId, apiKey);
     } catch (error) {
       console.error('Error saving API key:', error);
     }
@@ -938,13 +917,6 @@ const App: React.FC = () => {
                                 <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
                                   {provider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
                                 </span>
-                                <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                  provider.isActive 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {provider.isActive ? 'Active' : 'Inactive'}
-                                </span>
                               </div>
                               <div className="relative">
                                 <button 
@@ -973,9 +945,7 @@ const App: React.FC = () => {
                             </div>
                             <div className="flex flex-col space-y-2">
                               <p className="text-xs text-gray-500">
-                                {provider.isActive ? 
-                                  'API key is set and the integration is active.' : 
-                                  'No API key set. Click Edit to add your key.'}
+                                {'API key is set.'}
                               </p>
                             </div>
                           </div>

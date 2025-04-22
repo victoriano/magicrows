@@ -23,17 +23,17 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center space-x-3">
         <span className="text-sm font-medium">Dataset view:</span>
-        <div className="btn-group">
+        <div className="tabs tabs-lifted ml-2">
           <button
-            className={`btn btn-sm ${!isShowingEnrichedData ? 'btn-active' : ''}`}
-            onClick={() => setActiveDataset('original')}
+            className={`tab tab-lifted min-w-[6rem] px-4 ${!isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
+            onClick={() => !isProcessing && hasEnrichedData ? setActiveDataset('original') : null}
             disabled={isProcessing || !hasEnrichedData}
           >
             Original
           </button>
           <button
-            className={`btn btn-sm ${isShowingEnrichedData ? 'btn-active' : ''}`}
-            onClick={() => setActiveDataset('enriched')}
+            className={`tab tab-lifted min-w-[6rem] px-4 ${isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
+            onClick={() => !isProcessing && hasEnrichedData ? setActiveDataset('enriched') : null}
             disabled={isProcessing || !hasEnrichedData}
           >
             Enriched

@@ -21,49 +21,32 @@ module.exports = {
   daisyui: {
     themes: [
       {
-        modern: {
-          "primary": "hsl(230, 85%, 53%)", // Bright blue
-          "primary-focus": "hsl(230, 85%, 45%)", // Darker blue for focus states
-          "primary-content": "hsl(0, 0%, 100%)", // White text on primary
-          
-          "base-100": "hsl(0, 0%, 100%)", // Pure white
-          "base-200": "hsl(220, 20%, 97%)", // Very light gray with blue tint
-          "base-300": "hsl(220, 15%, 94%)", // Light gray with blue tint
-          "base-content": "hsl(220, 20%, 25%)", // Dark blue-gray for text
-          
-          "secondary": "hsl(210, 30%, 30%)", // Blue-gray
-          "secondary-content": "hsl(0, 0%, 100%)", // White text on secondary
-          
-          "accent": "hsl(160, 84%, 39%)", // Green
-          "accent-content": "hsl(160, 84%, 8%)", // Dark green text
-          
-          "neutral": "hsl(220, 10%, 30%)", // Neutral gray
-          "neutral-content": "hsl(220, 10%, 95%)", // Light text on neutral
-          
-          "info": "hsl(210, 90%, 57%)", // Blue
-          "info-content": "hsl(210, 90%, 15%)", // Dark blue text
-          
-          "success": "hsl(160, 84%, 39%)", // Green
-          "success-content": "hsl(160, 84%, 8%)", // Dark green text
-          
-          "warning": "hsl(40, 95%, 50%)", // Amber
-          "warning-content": "hsl(40, 95%, 13%)", // Dark amber text
-          
-          "error": "hsl(0, 85%, 60%)", // Red
-          "error-content": "hsl(0, 85%, 15%)", // Dark red text
-          
-          "--rounded-box": "0.75rem",
-          "--rounded-btn": "0.5rem",
-          "--rounded-badge": "0.375rem",
-          "--animation-btn": "0.2s",
-          "--animation-input": "0.2s",
-          "--btn-focus-scale": "0.95",
-          "--border-btn": "1px",
-          "--tab-radius": "0.5rem",
+        corporate: {
+          "--color-base-100": "#FFFFFF",
+          "--color-base-200": "#F3F4F9",
+          "--color-base-300": "#E5E7EF",
+          "--color-base-content": "#363C4F",
+          "--color-primary": "#3559E0",
+          "--color-primary-content": "#FFFFFF",
+          "--color-secondary": "#AAB0C0",
+          "--color-secondary-content": "#FFFFFF",
+          "--color-accent": "#2FA4D7",
+          "--color-accent-content": "#FFFFFF",
+          "--color-neutral": "#3A4256",
+          "--color-neutral-content": "#FFFFFF",
+          "--color-info": "#2FA4D7",
+          "--color-info-content": "#FFFFFF",
+          "--color-success": "#6CC261",
+          "--color-success-content": "#FFFFFF",
+          "--color-warning": "#FBC756",
+          "--color-warning-content": "#FFFFFF",
+          "--color-error": "#E9686A",
+          "--color-error-content": "#FFFFFF",
+          "--radius-selector": "0.5rem"
         },
       },
       "light",
-      "dark"
+      "dracula"
     ],
     base: true,
     styled: true,

@@ -74,7 +74,7 @@ const AIEnrichmentSelector: React.FC = () => {
       // select the first available provider as default
       if (providers.length > 0) {
         setSelectedProviderId(providers[0].id);
-        setProviderError(null);
+          setProviderError(null);
       } else {
         setProviderError("No AI providers available. Add a provider in Settings.");
         setSelectedProviderId(null);

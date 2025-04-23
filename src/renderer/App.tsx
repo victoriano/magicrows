@@ -47,6 +47,9 @@ const App: React.FC = () => {
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [editProviderApiKey, setEditProviderApiKey] = useState('');
   
+  // Theme state
+  const [currentTheme, setCurrentTheme] = useState('light');
+  
   // Redux
   const dispatch = useDispatch<AppDispatch>();
   const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data!);
@@ -681,6 +684,24 @@ const App: React.FC = () => {
     }
   };
 
+  // Function to handle theme change
+  const handleThemeChange = (themeName: string) => {
+    setCurrentTheme(themeName);
+    document.documentElement.setAttribute('data-theme', themeName);
+    
+    // Save theme preference to localStorage
+    localStorage.setItem('theme', themeName);
+  };
+
+  // Initialize theme from localStorage on component mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setCurrentTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
       <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
@@ -1002,6 +1023,37 @@ const App: React.FC = () => {
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">Processing Threads</label>
                       <input type="number" className="input input-bordered w-full" defaultValue={4} />
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-sm font-medium">UI Theme</label>
+                      <div className="bg-base-100 p-3 rounded-md border border-base-300">
+                        <div className="flex flex-col space-y-2">
+                          <p className="text-xs text-gray-600 mb-2">Select a theme to customize the application appearance</p>
+                          
+                          <div className="flex flex-wrap gap-2">
+                            <div onClick={() => handleThemeChange('light')} className={`cursor-pointer rounded-md border ${currentTheme === 'light' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                              <div className="flex flex-col items-center">
+                                <div className="w-6 h-6 rounded-full bg-white border border-gray-200"></div>
+                                <span className="text-xs mt-1">Light</span>
+                              </div>
+                            </div>
+                            
+                            <div onClick={() => handleThemeChange('corporate')} className={`cursor-pointer rounded-md border ${currentTheme === 'corporate' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                              <div className="flex flex-col items-center">
+                                <div className="w-6 h-6 rounded-full bg-[#F3F4F9] border border-[#3559E0]"></div>
+                                <span className="text-xs mt-1">Corporate</span>
+                              </div>
+                            </div>
+                            
+                            <div onClick={() => handleThemeChange('dracula')} className={`cursor-pointer rounded-md border ${currentTheme === 'dracula' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                              <div className="flex flex-col items-center">
+                                <div className="w-6 h-6 rounded-full bg-[#282a36] border border-[#bd93f9]"></div>
+                                <span className="text-xs mt-1">Dracula</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input type="checkbox" className="checkbox" />

@@ -11,4 +11,207 @@
   .placeholder {
     @apply flex items-center justify-center p-8 bg-base-300 text-base-content bg-opacity-50 rounded-lg;
   }
+}
+
+/* Dracula theme overrides to replace hard‑coded light colors */
+[data-theme='dracula'] {
+  /* Override all white backgrounds with theme colors */
+  .bg-white {
+    background-color: rgb(var(--b1)) !important; /* Use base-100 color */
+  }
+  
+  /* Override text colors */
+  .text-gray-800 {
+    color: rgb(var(--bc)) !important; /* Use base-content color */
+  }
+  
+  .text-gray-700,
+  .text-gray-600 {
+    color: rgb(var(--bc) / 0.8) !important;
+  }
+  
+  .text-gray-500,
+  .text-gray-400 {
+    color: rgb(var(--bc) / 0.6) !important;
+  }
+  
+  /* AGGRESSIVE border fixing - eliminate ALL white borders */
+  *, *::before, *::after {
+    border-color: rgba(68, 71, 90, 0.5) !important; /* Using dracula theme border color */
+  }
+  
+  /* Target specific border classes with higher specificity */
+  .border, 
+  .border-t, 
+  .border-r, 
+  .border-b, 
+  .border-l,
+  .border-x, 
+  .border-y,
+  [class*="border-gray"],
+  [class*="border-base"],
+  [class*="border-neutral"],
+  [class*="border-primary"],
+  [class*="border-secondary"],
+  [class*="border-accent"],
+  [class*="border-info"],
+  [class*="border-success"],
+  [class*="border-warning"],
+  [class*="border-error"] {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Specifically target inputs and form elements */
+  input, 
+  select, 
+  textarea,
+  .input,
+  .select,
+  .textarea,
+  .checkbox,
+  .radio,
+  .btn {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Target specific UI components that might have borders */
+  .card,
+  .card-bordered,
+  .dropdown,
+  .dropdown-content,
+  .menu,
+  .modal,
+  .modal-box,
+  .collapse,
+  .collapse-content,
+  .tab,
+  .tab-content,
+  .badge,
+  .badge-outline,
+  .alert,
+  .alert-info,
+  .alert-success,
+  .alert-warning,
+  .alert-error,
+  .divider,
+  .drawer,
+  .drawer-side,
+  .drawer-overlay,
+  .navbar,
+  .footer,
+  .tooltip,
+  .stat,
+  .avatar {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Target all table elements */
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Override hover states */
+  .hover\:bg-white\/50:hover {
+    background-color: rgb(var(--b2) / 0.5) !important;
+  }
+  
+  /* Make cards use theme colors */
+  .card {
+    background-color: rgb(var(--b1));
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Make tables use proper theme colors */
+  table {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+
+  table thead {
+    background-color: rgb(var(--b2)) !important;
+  }
+  
+  table thead th {
+    color: rgb(var(--bc) / 0.7) !important;
+  }
+
+  table td, 
+  table th {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Main app background */
+  .min-h-screen {
+    background-color: rgb(var(--b2)) !important;
+  }
+  
+  /* Fix header - make it solid, not transparent */
+  header.sticky {
+    background-color: rgb(var(--b1)) !important;
+    border-color: rgba(68, 71, 90, 0.5) !important;
+    box-shadow: none !important;
+  }
+  
+  /* Fix active tab indicators */
+  .tab-active {
+    background-color: rgb(var(--b1)) !important;
+  }
+  
+  /* Fix footer */
+  footer {
+    background-color: rgb(var(--b1)) !important;
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+  
+  /* Fix modals */
+  .modal-content {
+    background-color: rgb(var(--b1)) !important;
+  }
+
+  /* Fix form inputs */
+  input,
+  select,
+  textarea,
+  .input,
+  .select,
+  .textarea {
+    background-color: rgb(var(--b2)) !important; /* Slightly darker background */
+    border-color: rgba(68, 71, 90, 0.5) !important;
+    color: rgb(var(--bc)) !important;
+  }
+
+  /* Fix input placeholder color */
+  ::placeholder {
+    color: rgb(var(--bc) / 0.4) !important;
+  }
+
+  /* Fix dropdown menus */
+  .dropdown-content {
+    background-color: rgb(var(--b1)) !important;
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+
+  /* Fix table row hover */
+  tr:hover {
+    background-color: rgb(var(--b2)) !important;
+  }
+
+  /* Fix dividers/borders in the app */
+  hr {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+
+  /* Fix tab styling */
+  .tabs {
+    border-color: rgba(68, 71, 90, 0.5) !important;
+  }
+
+  /* Improve focus styles for better visibility in dark mode */
+  *:focus-visible {
+    outline-color: rgb(var(--p)) !important;
+  }
 } 

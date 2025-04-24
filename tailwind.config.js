@@ -49,8 +49,8 @@ module.exports = {
       // Light theme override – only change what we need (background greys)
       {
         light: {
-          "base-100": "#dedede", // page background
-          "base-200": "#9befa6", // cards / secondary panels
+          "base-100": "oklch(92% 0.004 286.32)", // page background
+          "base-200": "oklch(96% 0.003 264.542)", // cards / secondary panels
           "base-300": "#1a3e87", // borders / subtle fills
           "base-content": "#1f2937", // text
         },

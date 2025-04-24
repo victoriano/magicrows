@@ -1016,26 +1016,26 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">UI Theme</label>
-                      <div className="bg-base-100 p-3 rounded-md border border-base-300">
+                      <div className="bg-base-100 p-3 rounded-md border border-gray-200">
                         <div className="flex flex-col space-y-2">
                           <p className="text-xs text-gray-600 mb-2">Select a theme to customize the application appearance</p>
                           
                           <div className="flex flex-wrap gap-2">
-                            <div onClick={() => handleThemeChange('light')} className={`cursor-pointer rounded-md border ${currentTheme === 'light' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                            <div onClick={() => handleThemeChange('light')} className={`cursor-pointer rounded-md border ${currentTheme === 'light' ? 'border-primary' : 'border-gray-200'} p-2 flex items-center justify-center w-16`}>
                               <div className="flex flex-col items-center">
                                 <div className="w-6 h-6 rounded-full theme-preview-light border border-gray-200" style={{ backgroundColor: '#ffffff' }}></div>
                                 <span className="text-xs mt-1">Light</span>
                               </div>
                             </div>
                             
-                            <div onClick={() => handleThemeChange('corporate')} className={`cursor-pointer rounded-md border ${currentTheme === 'corporate' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                            <div onClick={() => handleThemeChange('corporate')} className={`cursor-pointer rounded-md border ${currentTheme === 'corporate' ? 'border-primary' : 'border-gray-200'} p-2 flex items-center justify-center w-16`}>
                               <div className="flex flex-col items-center">
                                 <div className="w-6 h-6 rounded-full bg-[#F3F4F9] border border-[#3559E0]"></div>
                                 <span className="text-xs mt-1">Corporate</span>
                               </div>
                             </div>
                             
-                            <div onClick={() => handleThemeChange('dracula')} className={`cursor-pointer rounded-md border ${currentTheme === 'dracula' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
+                            <div onClick={() => handleThemeChange('dracula')} className={`cursor-pointer rounded-md border ${currentTheme === 'dracula' ? 'border-primary' : 'border-gray-200'} p-2 flex items-center justify-center w-16`}>
                               <div className="flex flex-col items-center">
                                 <div className="w-6 h-6 rounded-full bg-[#282a36] border border-[#bd93f9]"></div>
                                 <span className="text-xs mt-1">Dracula</span>
@@ -1051,7 +1051,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="border-t border-gray-200 pt-4 mt-2">
                       <h4 className="text-sm font-medium mb-2">Maintenance</h4>
-                      <div className="collapse collapse-plus border border-base-300 bg-base-100 rounded-md">
+                      <div className="collapse collapse-plus border border-gray-200 bg-base-100 rounded-md">
                         <input type="checkbox" /> 
                         <div className="collapse-title text-sm font-medium py-2">
                           Advanced Maintenance Options

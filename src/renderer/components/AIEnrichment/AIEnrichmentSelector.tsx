@@ -276,12 +276,6 @@ const AIEnrichmentSelector: React.FC = () => {
         
         <div className="flex justify-end space-x-2">
           <button
-            className="px-3 py-1.5 bg-base-300 text-gray-700 rounded-md text-sm"
-            disabled={isProcessing}
-          >
-            Edit
-          </button>
-          <button
             className={`px-3 py-1.5 bg-primary text-white rounded-md text-sm flex items-center ${
               isProcessing ? 'opacity-75' : ''
             }`}

@@ -23,16 +23,16 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center space-x-3">
         <span className="text-sm font-medium">Dataset view:</span>
-        <div className="tabs tabs-lifted ml-2">
+        <div className="tabs ml-2 border-b-0">
           <button
-            className={`tab tab-lifted min-w-[6rem] px-4 ${!isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
+            className={`tab min-w-[6rem] px-4 ${!isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
             onClick={() => !isProcessing && hasEnrichedData ? setActiveDataset('original') : null}
             disabled={isProcessing || !hasEnrichedData}
           >
             Original
           </button>
           <button
-            className={`tab tab-lifted min-w-[6rem] px-4 ${isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
+            className={`tab min-w-[6rem] px-4 ${isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}
             onClick={() => !isProcessing && hasEnrichedData ? setActiveDataset('enriched') : null}
             disabled={isProcessing || !hasEnrichedData}
           >
@@ -54,7 +54,7 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
       {/* Export button always shown */}
       {onExport && (
         <button 
-          className="btn btn-ghost border border-base-300 hover:bg-base-200 gap-2 transition-all"
+          className="btn btn-ghost hover:bg-base-200 gap-2 transition-all"
           onClick={onExport}
           disabled={isProcessing}
           title="Export data as CSV file"

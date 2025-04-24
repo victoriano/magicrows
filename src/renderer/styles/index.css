@@ -168,7 +168,7 @@
   
   /* Fix header - make it solid, not transparent */
   header.sticky {
-    background-color: rgb(var(--b1)) !important;
+    background-color: rgb(var(--b1)) !important; /* Use base-100 */
     border-color: rgba(68, 71, 90, 0.5) !important;
     box-shadow: none !important;
   }
@@ -180,7 +180,7 @@
   
   /* Fix footer */
   footer {
-    background-color: rgb(var(--b1)) !important;
+    background-color: rgb(var(--b1)) !important; /* Use base-100 */
     border-color: rgba(68, 71, 90, 0.5) !important;
   }
   

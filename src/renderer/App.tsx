@@ -694,7 +694,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
-      <header className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm py-3 px-6">
+      <header className="sticky top-0 z-10 bg-base-100 py-3 px-6">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <img src={magicRowsLogo} alt="MagicRows Logo" className="h-8 mr-2" />
@@ -1148,7 +1148,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-4 border-t bg-white mt-auto">
+      <footer className="py-4 border-t bg-base-100 mt-auto">
         <div className="container mx-auto px-6 text-center text-sm text-gray-500">
           <p>MagicRows &copy; {new Date().getFullYear()} | Version 0.1.0</p>
         </div>

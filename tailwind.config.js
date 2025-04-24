@@ -20,33 +20,44 @@ module.exports = {
   plugins: [require('daisyui')],
   daisyui: {
     themes: [
+      // Corporate theme (custom)
       {
         corporate: {
-          "--color-base-100": "#FFFFFF",
-          "--color-base-200": "#F3F4F9",
-          "--color-base-300": "#E5E7EF",
-          "--color-base-content": "#363C4F",
-          "--color-primary": "#3559E0",
-          "--color-primary-content": "#FFFFFF",
-          "--color-secondary": "#AAB0C0",
-          "--color-secondary-content": "#FFFFFF",
-          "--color-accent": "#2FA4D7",
-          "--color-accent-content": "#FFFFFF",
-          "--color-neutral": "#3A4256",
-          "--color-neutral-content": "#FFFFFF",
-          "--color-info": "#2FA4D7",
-          "--color-info-content": "#FFFFFF",
-          "--color-success": "#6CC261",
-          "--color-success-content": "#FFFFFF",
-          "--color-warning": "#FBC756",
-          "--color-warning-content": "#FFFFFF",
-          "--color-error": "#E9686A",
-          "--color-error-content": "#FFFFFF",
-          "--radius-selector": "0.5rem"
+          primary: "#3559E0",
+          "primary-content": "#FFFFFF",
+          secondary: "#AAB0C0",
+          "secondary-content": "#FFFFFF",
+          accent: "#2FA4D7",
+          "accent-content": "#FFFFFF",
+          neutral: "#3A4256",
+          "neutral-content": "#FFFFFF",
+
+          // Status colours
+          info: "#2FA4D7",
+          success: "#6CC261",
+          warning: "#FBC756",
+          error: "#E9686A",
+
+          // Background levels
+          "base-100": "#FFFFFF",
+          "base-200": "#F3F4F9",
+          "base-300": "#E5E7EF",
+          "base-content": "#363C4F",
         },
       },
-      "light",
-      "dracula"
+
+      // Light theme override – only change what we need (background greys)
+      {
+        light: {
+          "base-100": "#eac9c9", // page background
+          "base-200": "#9befa6", // cards / secondary panels
+          "base-300": "#1a3e87", // borders / subtle fills
+          "base-content": "#1f2937", // text
+        },
+      },
+
+      // Built-in Dracula theme
+      "dracula",
     ],
     base: true,
     styled: true,

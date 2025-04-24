@@ -1148,7 +1148,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-4 border-t bg-base-100 mt-auto">
+      <footer className="py-4 bg-base-100 mt-auto">
         <div className="container mx-auto px-6 text-center text-sm text-gray-500">
           <p>MagicRows &copy; {new Date().getFullYear()} | Version 0.1.0</p>
         </div>

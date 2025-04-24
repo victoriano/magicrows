@@ -30,6 +30,12 @@
   color: #4b5563 !important; /* gray-600 */
 }
 
+/* Make inputs white in Light theme */
+[data-theme='light'] input,
+[data-theme='light'] .input {
+  background-color: #ffffff !important;
+}
+
 /* Dracula theme overrides to replace hard‑coded light colors */
 [data-theme='dracula'] {
   /* Override all white backgrounds with theme colors */

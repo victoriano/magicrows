@@ -934,8 +934,8 @@ const App: React.FC = () => {
                           <div key={provider.uniqueId || `provider-${provider.id}`} className="bg-base-100 p-3 rounded-md border border-gray-200">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-2">
-                                <span className="font-medium text-sm">{provider.name}</span>
-                                <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
+                                <span className="font-medium">{provider.name}</span>
+                                <span className="px-2 py-0.5 text-xs bg-neutral text-neutral-content rounded-md">
                                   {provider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
                                 </span>
                               </div>
@@ -1033,7 +1033,7 @@ const App: React.FC = () => {
                           <div className="flex flex-wrap gap-2">
                             <div onClick={() => handleThemeChange('light')} className={`cursor-pointer rounded-md border ${currentTheme === 'light' ? 'border-primary' : 'border-base-300'} p-2 flex items-center justify-center w-16`}>
                               <div className="flex flex-col items-center">
-                                <div className="w-6 h-6 rounded-full bg-white border border-gray-200"></div>
+                                <div className="w-6 h-6 rounded-full theme-preview-light border border-gray-200" style={{ backgroundColor: '#ffffff' }}></div>
                                 <span className="text-xs mt-1">Light</span>
                               </div>
                             </div>

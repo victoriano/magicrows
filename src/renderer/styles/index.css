@@ -13,6 +13,23 @@
   }
 }
 
+/* Theme preview circle fixes */
+/* Force the light theme preview to be white regardless of current theme */
+[data-theme='dracula'] .theme-preview-light {
+  background-color: #ffffff !important;
+}
+
+/* Provider pill/badge styling - restore light gray pills for light/corporate themes */
+[data-theme='light'] .bg-neutral,
+[data-theme='corporate'] .bg-neutral {
+  background-color: #f3f4f6 !important; /* light gray (bg-gray-100) */
+}
+
+[data-theme='light'] .text-neutral-content,
+[data-theme='corporate'] .text-neutral-content {
+  color: #4b5563 !important; /* gray-600 */
+}
+
 /* Dracula theme overrides to replace hard‑coded light colors */
 [data-theme='dracula'] {
   /* Override all white backgrounds with theme colors */
@@ -213,5 +230,17 @@
   /* Improve focus styles for better visibility in dark mode */
   *:focus-visible {
     outline-color: rgb(var(--p)) !important;
+  }
+  
+  /* Fix provider pills/badges/tags */
+  .bg-gray-100 {
+    background-color: rgb(var(--n)) !important;
+  }
+  
+  /* Style pills for vendor tags like "OpenAI" */
+  span[class*="px-2 py-0.5 text-xs"] {
+    background-color: rgb(var(--n)) !important;
+    color: rgb(var(--nc)) !important;
+    border-color: rgba(68, 71, 90, 0.5) !important;
   }
 } 

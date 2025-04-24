@@ -107,7 +107,7 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
               {selectedProvider ? (
                 <>
                   <span className="font-medium">{selectedProvider.name}</span>
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-neutral text-neutral-content rounded-md">
                     {selectedProvider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
                   </span>
                 </>
@@ -150,7 +150,7 @@ const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
                   <div className="flex flex-col">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium">{provider.name}</span>
-                      <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-md">
+                      <span className="px-2 py-0.5 text-xs bg-neutral text-neutral-content rounded-md">
                         {provider.type === 'openai' ? 'OpenAI' : 'Perplexity'}
                       </span>
                     </div>

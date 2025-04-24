@@ -111,16 +111,6 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useLayoutEffect(() => {
-    const timer = setTimeout(() => {
-      const htmlElement = document.documentElement;
-      htmlElement.setAttribute('data-theme', 'modern');
-      console.log('Theme set to modern');
-    }, 0);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
   const handleReloadFile = (filePath: string) => {
     dispatch(setLoading(true));
     
@@ -693,13 +683,13 @@ const App: React.FC = () => {
     localStorage.setItem('theme', themeName);
   };
 
-  // Initialize theme from localStorage on component mount
+  // Initialize theme from localStorage on component mount, defaulting to 'light'
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      setCurrentTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    }
+    const initialTheme = savedTheme || 'light'; // Default to 'light'
+    setCurrentTheme(initialTheme);
+    document.documentElement.setAttribute('data-theme', initialTheme);
+    console.log(`Theme initialized to: ${initialTheme}`);
   }, []);
 
   return (

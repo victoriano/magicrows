@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
-import fetch from 'node-fetch';
 import * as fs from 'fs';
+import { initSecureStorage } from './secureStorage'; // Import secure storage initializer
 
 // Add type declaration for import.meta.env
 declare global {
@@ -17,14 +17,24 @@ if (require('electron-squirrel-startup')) {
 
 let mainWindow: BrowserWindow | null = null;
 
-const createWindow = (): void => {
-  // Create the browser window.
+export const createWindow = (): BrowserWindow => {
+  // *** Debug: Log platform ***
+  console.log(`[Main Process] Detected platform: ${process.platform}`);
+
+  // *** Debug: Simplify options to bare minimum for frameless ***
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false, // The most basic way to request frameless
+    titleBarStyle: 'hiddenInset', // Re-enable for macOS
+    titleBarOverlay: {
+      color: '#d1d5db',  // Tailwind gray-300
+      symbolColor: '#1f2937', // Tailwind gray-800
+      height: 28 // Explicitly set height for macOS
+    },
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
+      preload: path.join(__dirname, '../preload/preload.js'),
+      nodeIntegration: true,
       contextIsolation: true,
     },
   });
@@ -40,9 +50,11 @@ const createWindow = (): void => {
   mainWindow.loadURL(MAIN_URL);
 
   // Open the DevTools.
-  if (import.meta.env.DEV) {
-    mainWindow.webContents.openDevTools();
-  }
+  // if (import.meta.env.DEV) {
+  //   mainWindow.webContents.openDevTools();
+  // }
+
+  return mainWindow;
 };
 
 // Register IPC handlers
@@ -57,6 +69,9 @@ function registerIpcHandlers() {
     console.log(`[Main Process] Method: ${method}`);
     
     try {
+      // Dynamically import node-fetch
+      const { default: fetch } = await import('node-fetch');
+      
       // Make the API call using node-fetch
       const response = await fetch(url, {
         method,
@@ -189,8 +204,17 @@ function registerIpcHandlers() {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
-  // Register IPC handlers first, before creating the window
+app.on('ready', async () => {
+  // Initialize secure storage and its IPC handlers
+  try {
+    await initSecureStorage(); // Wait for initialization
+    console.log('Secure storage initialized successfully.');
+  } catch (error) {
+    console.error('Failed to initialize secure storage:', error);
+    // You might want to show an error dialog to the user here
+  }
+
+  // Register other IPC handlers first, before creating the window
   registerIpcHandlers();
   
   // Then create the browser window

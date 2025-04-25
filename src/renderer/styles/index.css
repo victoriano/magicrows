@@ -58,12 +58,8 @@
     color: rgb(var(--bc) / 0.6) !important;
   }
   
-  /* AGGRESSIVE border fixing - eliminate ALL white borders */
-  *, *::before, *::after {
-    border-color: rgba(68, 71, 90, 0.5) !important; /* Using dracula theme border color */
-  }
-  
-  /* Target specific border classes with higher specificity */
+  /* AGGRESSIVE border fixing - SCOPED TO DRACULA THEME */
+  /* Use Dracula border color for common border classes */
   .border, 
   .border-t, 
   .border-r, 
@@ -172,10 +168,10 @@
     background-color: rgb(var(--b2)) !important;
   }
   
-  /* Fix header - make it solid, not transparent */
+  /* Fix header - make it solid, not transparent and remove border */
   header.sticky {
     background-color: rgb(var(--b1)) !important; /* Use base-100 */
-    border-color: rgba(68, 71, 90, 0.5) !important;
+    border-bottom: none !important; /* Explicitly remove border */
     box-shadow: none !important;
   }
   

@@ -15,10 +15,12 @@ module.exports = {
     productName: 'MagicRows',
     appBundleId: 'com.magicrows.app',
     // Ensure native modules are properly built for the target platform
-    ignore: [
-      "/node_modules/electron-store/node_modules/(?!.yarn-integrity)",
-      "/node_modules/(?!electron-store)/.*"
-    ]
+    // *** Temporarily simplified ignore for debugging ***
+    // ignore: [
+    //   "/node_modules/electron-store/node_modules/(?!.yarn-integrity)",
+    //   "/node_modules/(?!electron-store)/.*"
+    // ]
+    ignore: (filePath) => !/(^\/(src|node_modules\/electron-store|package\.json)$)|(\.vite)/.test(filePath),
   },
   rebuildConfig: {
     // Force rebuilding native modules for the target platform

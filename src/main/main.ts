@@ -81,6 +81,13 @@ const createWindow = async (): Promise<void> => {
     title: 'MagicRows',
     width: 1280,
     height: 720,
+    frame: false, // Hide standard frame
+    titleBarStyle: 'hiddenInset', // macOS specific styling
+    titleBarOverlay: { // macOS specific styling
+      color: '#d1d5db',  // Tailwind gray-300
+      symbolColor: '#1f2937', // Tailwind gray-800
+      height: 28
+    },
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -211,7 +218,7 @@ const createWindow = async (): Promise<void> => {
     if (fs.existsSync(indexPath)) {
       mainWindow.loadFile(indexPath);
       // Enable DevTools in production to help debug storage issues
-      mainWindow.webContents.openDevTools();
+      // mainWindow.webContents.openDevTools(); // Also comment out here
     } else {
       // Display an error page when index.html can't be found
       mainWindow.loadURL(`data:text/html;charset=utf-8,
@@ -228,6 +235,7 @@ const createWindow = async (): Promise<void> => {
           </body>
         </html>
       `);
+      // mainWindow.webContents.openDevTools(); // Also comment out here
     }
   }
 

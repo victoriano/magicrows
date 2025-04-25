@@ -694,13 +694,23 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-base-100 text-base-content">
-      <header className="sticky top-0 z-10 bg-base-100 py-3 px-6">
+      {/* Apply -webkit-app-region: drag to make the header draggable */}
+      {/* Add pt-1 to account for the slightly inset title bar controls */}
+      <header 
+        className="sticky top-0 z-10 bg-base-100 py-5 px-6 pt-3"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
         <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center">
+          {/* Add pl-[70px] to push content past macOS controls */}
+          <div className="flex items-center pl-[70px]">
             <img src={magicRowsLogo} alt="MagicRows Logo" className="h-8 mr-2" />
             <h1 className="text-xl font-bold text-gray-800">MagicRows</h1>
           </div>
-          <div className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm">
+          {/* Apply -webkit-app-region: no-drag to buttons so they are clickable */}
+          <div 
+            className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
             {['Import', 'Data', 'Settings'].map((tab) => (
               <button
                 key={tab}

@@ -29,7 +29,8 @@ interface Provider {
 }
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('import');
+  const [activeTab, setActiveTab] = useState('data');
+  const [showDataOptions, setShowDataOptions] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [columnToProcess, setColumnToProcess] = useState('');
   const [dropzoneActive, setDropzoneActive] = useState(false);
@@ -711,7 +712,7 @@ const App: React.FC = () => {
             className="flex items-center space-x-1 bg-base-200 p-1 rounded-lg shadow-sm"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            {['Import', 'Data', 'Settings'].map((tab) => (
+            {['Data', 'Settings'].map((tab) => (
               <button
                 key={tab}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
@@ -729,8 +730,10 @@ const App: React.FC = () => {
       </header>
 
       <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
-        {activeTab === 'import' && (
-          <>
+        {activeTab === 'data' && (
+          <div className="space-y-6">
+            {/* Upload + Recent Activity Grid (hidden during preview) */}
+            {!(csvData && isPreviewActive) && (
             <div className="grid grid-cols-3 gap-6">
               {/* Data Upload Section */}
               <div className="col-span-2 bg-white rounded-xl shadow-card p-6">
@@ -783,7 +786,7 @@ const App: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               {/* Recent Activity Section */}
               <div className="col-span-1 bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -792,7 +795,6 @@ const App: React.FC = () => {
                     <p className="text-sm text-gray-600">Previously loaded files</p>
                   </div>
                 </div>
-                
                 {recentFiles.length > 0 ? (
                   <div className="h-[200px] overflow-y-auto">
                     <div className="space-y-3">
@@ -843,54 +845,131 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                    <p className="text-sm text-gray-500">No recent files</p>
-                    <p className="text-xs text-gray-400 mt-1">Upload a file to get started</p>
-                    <p className="text-xs text-gray-500 mt-2">Debug: {recentFiles.length} files in state</p>
-                    <button 
-                      className="mt-3 px-3 py-1 text-xs bg-base-300 rounded-md"
-                      onClick={addTestFile}
-                    >
-                      Add Test File (Debug)
-                    </button>
+                    <p className="text-sm text-gray-500 mb-1">No recent files</p>
+                    <p className="text-xs text-gray-400 text-center mb-4">Upload a file to get started</p>
                   </div>
                 )}
               </div>
             </div>
+            )}
             
-            {/* Preview Section - Spans Full Width */}
             {csvData && isPreviewActive && (
               <div className="bg-white rounded-xl shadow-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
+                {/* Preview Section */}
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>
                     <button 
-                      className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm"
+                      className="px-4 py-2 text-sm bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus"
                       onClick={() => {
                         dispatch(markPreviewAsImported());
-                        setActiveTab('data');
                       }}
                     >
-                      Import
+                      Import Data
                     </button>
                     <button 
-                      className="px-3 py-1 text-sm bg-base-200 rounded-md"
-                      onClick={handleClearFile}
+                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md shadow-sm hover:bg-gray-300"
+                      onClick={() => dispatch(clearData())}
                     >
-                      Clear
+                      Cancel
                     </button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
+                
+                {/* Simple Preview Table (First 10 rows) */}
+                <div className="overflow-x-auto max-h-[60vh]">
                   <table className="w-full text-sm">
-                    <thead className="bg-base-200 text-left">
+                    <thead className="bg-base-200 text-left sticky top-0">
                       <tr>
+                        {csvData.headers.map((header, index) => (
+                          <th key={index} className="p-3 font-semibold text-gray-700">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvData.rows.slice(0, 10).map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-gray-200 hover:bg-base-100">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="p-3 text-gray-600">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {csvData.rows.length > 10 && (
+                    <div className="text-center text-sm text-gray-500 pt-2">
+                      ... and {csvData.rows.length - 10} more rows
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Imported Data Table */}
+            {csvData && !isPreviewActive && (
+              <div className="bg-white rounded-xl shadow-card p-6">
+                <div className="flex items-center justify-between mb-4 relative"> {/* Added relative positioning for dropdown */}
+                  <div>
+                    {/* Display Filename */}
+                    <h2 className="text-lg font-semibold text-gray-800 truncate pr-2">
+                      {currentFileName || 'Loaded Data'}
+                    </h2>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">{csvData.rows.length} rows</span> {/* Keep row count */}
+                    <button
+                      onClick={() => setShowDataOptions(!showDataOptions)}
+                      className="p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      aria-label="Data options"
+                    >
+                      {/* Basic Three Dots SVG Icon */}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showDataOptions && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-10 top-full">
+                        <button
+                          onClick={() => {
+                            dispatch(clearData());
+                            setShowDataOptions(false); // Close dropdown after action
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Replace Dataset
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* AI Enrichment Panel */}
+                <AIEnrichmentSelector />
+                {/* Processing Status Indicator */}
+                <ProcessingStatusIndicator />
+                {/* Dataset Selector with Export button */}
+                <DatasetSelector onExport={handleExportCsv} />
+                {/* Existing Table Structure */}
+                <div className="overflow-x-auto max-h-[60vh]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-base-200 text-left sticky top-0">
+                      <tr>
+                        {/* Render headers based on active dataset */}
                         {displayHeaders.map((header, index) => (
                           <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
+                      {/* Render rows based on active dataset */}
                       {displayRows.map((row, rowIndex) => (
                         <tr key={rowIndex} className="hover:bg-base-200/30">
                           {row.map((cell, cellIndex) => (
@@ -903,21 +982,8 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
-            
-            {/* Error message display */}
-            {/* {error && (
-              <div className="mt-2 p-3 bg-error/10 border border-error/20 rounded-md flex items-center text-sm text-error">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )} */}
-            
-            {/* Add your preview section here */}
-          </>
+          </div>
         )}
-
         {activeTab === 'settings' && (
           <div className="col-span-1 md:col-span-2 lg:col-span-3">
             <div className="bg-white rounded-xl shadow-card p-6">
@@ -1088,75 +1154,6 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'data' && (
-          <div className="space-y-6">
-            {csvData ? (
-              <>
-                <div className="bg-white rounded-xl shadow-card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-800">Imported Data</h2>
-                      <p className="text-sm text-gray-600">
-                        {currentFileName && `Current file: ${currentFileName}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* AI Enrichment Panel */}
-                  <AIEnrichmentSelector />
-                  
-                  {/* Processing Status Indicator */}
-                  <ProcessingStatusIndicator />
-                  
-                  {/* Dataset Selector with Export button */}
-                  <DatasetSelector onExport={handleExportCsv} />
-                  
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-base-200 text-left sticky top-0">
-                        <tr>
-                          {/* Render headers based on active dataset */}
-                          {displayHeaders.map((header, index) => (
-                            <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {/* Render rows based on active dataset */}
-                        {displayRows.map((row, rowIndex) => (
-                          <tr key={rowIndex} className="hover:bg-base-200/30">
-                            {row.map((cell, cellIndex) => (
-                              <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="bg-white rounded-xl shadow-card p-6 text-center">
-                <div className="py-8">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No Data Imported</h3>
-                  <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    Import a CSV file from the Import tab to view and process your data.
-                  </p>
-                  <button 
-                    className="px-4 py-2 bg-primary text-white rounded-md shadow-sm"
-                    onClick={() => setActiveTab('import')}
-                  >
-                    Go to Import
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </main>

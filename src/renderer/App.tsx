@@ -732,8 +732,8 @@ const App: React.FC = () => {
       <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
         {activeTab === 'data' && (
           <div className="space-y-6">
-            {/* Only show upload and recent activity if no data is loaded OR we're in preview mode */}
-            {(!csvData || isPreviewActive) && (
+            {/* Only show upload and recent activity if no data is loaded at all */}
+            {!csvData && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Data Upload Section */}
                 <div 

@@ -892,9 +892,9 @@ const App: React.FC = () => {
             {csvData && !isPreviewActive && (
               <div>
                 {/* Wrapper for content and panel with flex layout */}
-                <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex flex-col md:flex-row gap-4 w-full overflow-hidden">
                   {/* Main content container */}
-                  <div className={`bg-white rounded-xl shadow-card p-6 flex-1 transition-all duration-300`}>
+                  <div className={`bg-white rounded-xl shadow-card p-6 flex-1 transition-all duration-300 min-w-0`}>
                     <div className="flex items-center justify-between mb-4 relative">
                       <div>
                         {/* Display Filename */}
@@ -953,34 +953,36 @@ const App: React.FC = () => {
                       </button>
                     </div>
  
-                    {/* Existing Table Structure */}
-                    <div className="overflow-x-auto max-h-[60vh]">
-                      <table className="w-full text-sm">
-                        <thead className="bg-base-200 text-left sticky top-0">
-                          <tr>
-                            {/* Render headers based on active dataset */}
-                            {displayHeaders.map((header, index) => (
-                              <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {/* Render rows based on active dataset */}
-                          {displayRows.map((row, rowIndex) => (
-                            <tr key={rowIndex} className="hover:bg-base-200/30">
-                              {row.map((cell, cellIndex) => (
-                                <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
+                    {/* Existing Table Structure - contained scrolling */}
+                    <div className="overflow-x-auto w-full" style={{ maxWidth: '100%' }}>
+                      <div className="max-h-[60vh] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-base-200 text-left sticky top-0 z-10">
+                            <tr>
+                              {/* Render headers based on active dataset */}
+                              {displayHeaders.map((header, index) => (
+                                <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
                               ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {/* Render rows based on active dataset */}
+                            {displayRows.map((row, rowIndex) => (
+                              <tr key={rowIndex} className="hover:bg-base-200/30">
+                                {row.map((cell, cellIndex) => (
+                                  <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div> {/* End of main content container */}
                   
                   {/* AI Panel - integrated in flex layout */}
                   {isAIPanelOpen && (
-                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] transition-all duration-300 overflow-hidden flex-shrink-0">
+                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] transition-all duration-300 overflow-hidden flex-shrink-0 min-w-0">
                       {/* Panel Header */}
                       <div className="flex items-center justify-between p-4 border-b">
                         <h3 className="font-semibold text-gray-800">AI Enrichment</h3>

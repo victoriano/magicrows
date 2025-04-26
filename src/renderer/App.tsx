@@ -31,6 +31,7 @@ interface Provider {
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('data');
   const [showDataOptions, setShowDataOptions] = useState(false);
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [columnToProcess, setColumnToProcess] = useState('');
   const [dropzoneActive, setDropzoneActive] = useState(false);
@@ -889,71 +890,116 @@ const App: React.FC = () => {
 
             {/* Imported Data Table */}
             {csvData && !isPreviewActive && (
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <div className="flex items-center justify-between mb-4 relative"> {/* Added relative positioning for dropdown */}
-                  <div>
-                    {/* Display Filename */}
-                    <h2 className="text-lg font-semibold text-gray-800 truncate pr-2">
-                      {currentFileName || 'Loaded Data'}
-                    </h2>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-500">{csvData.rows.length} rows</span> {/* Keep row count */}
-                    <button
-                      onClick={() => setShowDataOptions(!showDataOptions)}
-                      className="p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      aria-label="Data options"
-                    >
-                      {/* Basic Three Dots SVG Icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {showDataOptions && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-10 top-full">
+              <div>
+                {/* Wrapper for content and panel with flex layout */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Main content container */}
+                  <div className={`bg-white rounded-xl shadow-card p-6 flex-1 transition-all duration-300`}>
+                    <div className="flex items-center justify-between mb-4 relative">
+                      <div>
+                        {/* Display Filename */}
+                        <h2 className="text-lg font-semibold text-gray-800 truncate pr-2">
+                          {currentFileName || 'Loaded Data'}
+                        </h2>
+                      </div>
+ 
+                      {/* Options Button (Three Dots) */}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-500">{csvData.rows.length} rows</span> {/* Keep row count */}
                         <button
-                          onClick={() => {
-                            dispatch(clearData());
-                            setShowDataOptions(false); // Close dropdown after action
-                          }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowDataOptions(!showDataOptions)}
+                          className="p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          aria-label="Data options"
                         >
-                          Replace Dataset
+                          {/* Basic Three Dots SVG Icon */}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </button>
+ 
+                        {/* Dropdown Menu */}
+                        {showDataOptions && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-10 top-full">
+                            <button
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                              onClick={() => {
+                                dispatch(clearData());
+                                setShowDataOptions(false); // Close dropdown after action
+                              }}
+                            >
+                              Replace Dataset
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Processing Status Indicator */}
+                    <ProcessingStatusIndicator />
+                    
+                    {/* Dataset/Export controls */}
+                    <div className="flex justify-between items-center mb-4">
+                      <DatasetSelector onExport={handleExportCsv} />
+                      
+                      {/* AI Enrichment Toggle Button */}
+                      <button
+                        onClick={() => setIsAIPanelOpen(!isAIPanelOpen)}
+                        className="px-4 py-2 bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus flex items-center space-x-2 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>AI Enrichment</span>
+                      </button>
+                    </div>
+ 
+                    {/* Existing Table Structure */}
+                    <div className="overflow-x-auto max-h-[60vh]">
+                      <table className="w-full text-sm">
+                        <thead className="bg-base-200 text-left sticky top-0">
+                          <tr>
+                            {/* Render headers based on active dataset */}
+                            {displayHeaders.map((header, index) => (
+                              <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {/* Render rows based on active dataset */}
+                          {displayRows.map((row, rowIndex) => (
+                            <tr key={rowIndex} className="hover:bg-base-200/30">
+                              {row.map((cell, cellIndex) => (
+                                <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div> {/* End of main content container */}
+                  
+                  {/* AI Panel - integrated in flex layout */}
+                  {isAIPanelOpen && (
+                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] transition-all duration-300 overflow-hidden flex-shrink-0">
+                      {/* Panel Header */}
+                      <div className="flex items-center justify-between p-4 border-b">
+                        <h3 className="font-semibold text-gray-800">AI Enrichment</h3>
+                        <button 
+                          onClick={() => setIsAIPanelOpen(false)}
+                          className="p-1 rounded-full hover:bg-gray-100"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
                         </button>
                       </div>
-                    )}
-                  </div>
-                </div>
-                {/* AI Enrichment Panel */}
-                <AIEnrichmentSelector />
-                {/* Processing Status Indicator */}
-                <ProcessingStatusIndicator />
-                {/* Dataset Selector with Export button */}
-                <DatasetSelector onExport={handleExportCsv} />
-                {/* Existing Table Structure */}
-                <div className="overflow-x-auto max-h-[60vh]">
-                  <table className="w-full text-sm">
-                    <thead className="bg-base-200 text-left sticky top-0">
-                      <tr>
-                        {/* Render headers based on active dataset */}
-                        {displayHeaders.map((header, index) => (
-                          <th key={index} className="px-4 py-2 text-xs font-medium text-gray-600 truncate">{header}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {/* Render rows based on active dataset */}
-                      {displayRows.map((row, rowIndex) => (
-                        <tr key={rowIndex} className="hover:bg-base-200/30">
-                          {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="px-4 py-2 text-gray-700 truncate">{cell}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      
+                      {/* Panel Content - AI Enrichment Selector */}
+                      <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+                        <AIEnrichmentSelector />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1071,7 +1117,7 @@ const App: React.FC = () => {
                     <div className="flex flex-col space-y-1">
                       <label className="text-sm font-medium">UI Theme</label>
                       <div className="bg-base-100 p-3 rounded-md border border-gray-200">
-                        <div className="flex flex-col space-y-2">
+                        <div className="flex flex-col items-center">
                           <p className="text-xs text-gray-600 mb-2">Select a theme to customize the application appearance</p>
                           
                           <div className="flex flex-wrap gap-2">

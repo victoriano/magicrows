@@ -858,7 +858,9 @@ const App: React.FC = () => {
                 {/* Preview Section */}
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      Preview {currentFileName && <span className="font-normal text-gray-600 ml-2">- {currentFileName}</span>}
+                    </h2>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>

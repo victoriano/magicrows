@@ -12,7 +12,7 @@ import {
   getProviderApiKey
 } from './store/slices/providerSlice';
 import { RootState, AppDispatch, persistor } from './store';
-import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp } from './store/slices/dataSlice';
+import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp, markPreviewAsImported } from './store/slices/dataSlice';
 import { loadExternalPresets } from './store/slices/aiEnrichmentSlice';
 import Papa from 'papaparse';
 // @ts-ignore - This file exists at runtime, ignore TypeScript error
@@ -52,7 +52,7 @@ const App: React.FC = () => {
   
   // Redux
   const dispatch = useDispatch<AppDispatch>();
-  const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error } = useSelector((state: RootState) => state.data!);
+  const { csvData, recentFiles, currentFilePath, currentFileName, isLoading, error, isPreviewActive } = useSelector((state: RootState) => state.data!);
   const providers = useSelector((state: RootState) => state.providers?.providers || []);
   const aiEnrichment = useSelector((state: RootState) => state.aiEnrichment);
   
@@ -741,7 +741,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="upload-container">
-                  {currentFileName && csvData ? (
+                  {currentFileName && csvData && isPreviewActive ? (
                     <div className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center bg-base-200">
                       <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -858,7 +858,7 @@ const App: React.FC = () => {
             </div>
             
             {/* Preview Section - Spans Full Width */}
-            {csvData && (
+            {csvData && isPreviewActive && (
               <div className="bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-800">Preview</h2>
@@ -866,7 +866,10 @@ const App: React.FC = () => {
                     <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>
                     <button 
                       className="px-3 py-1 text-sm bg-primary text-white rounded-md shadow-sm"
-                      onClick={() => setActiveTab('data')}
+                      onClick={() => {
+                        dispatch(markPreviewAsImported());
+                        setActiveTab('data');
+                      }}
                     >
                       Import
                     </button>

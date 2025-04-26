@@ -18,6 +18,7 @@ interface DataState {
   currentFilePath: string | null;
   currentFileName: string | null;
   recentFiles: RecentFile[];
+  isPreviewActive: boolean;
 }
 
 const initialState: DataState = {
@@ -28,6 +29,7 @@ const initialState: DataState = {
   currentFilePath: null,
   currentFileName: null,
   recentFiles: [],
+  isPreviewActive: false,
 };
 
 export const dataSlice = createSlice({
@@ -46,6 +48,7 @@ export const dataSlice = createSlice({
       };
       state.filteredData = action.payload.rows;
       state.error = null;
+      state.isPreviewActive = true;
       
       // Update file path and name if provided
       if (action.payload.filePath) {
@@ -84,6 +87,7 @@ export const dataSlice = createSlice({
       state.filteredData = null;
       state.currentFilePath = null;
       state.currentFileName = null;
+      state.isPreviewActive = false;
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -91,6 +95,9 @@ export const dataSlice = createSlice({
     setError: (state, action: PayloadAction<string>) => {
       state.error = action.payload;
       state.isLoading = false;
+    },
+    markPreviewAsImported: (state) => {
+      state.isPreviewActive = false;
     },
     removeRecentFile: (state, action: PayloadAction<string>) => {
       state.recentFiles = state.recentFiles.filter(file => file.id !== action.payload);
@@ -123,6 +130,7 @@ export const {
   clearData, 
   setLoading, 
   setError,
+  markPreviewAsImported,
   removeRecentFile,
   setRecentFiles,
   updateFileTimestamp

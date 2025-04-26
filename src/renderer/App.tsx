@@ -732,130 +732,112 @@ const App: React.FC = () => {
       <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
         {activeTab === 'data' && (
           <div className="space-y-6">
-            {/* Upload + Recent Activity Grid (hidden during preview) */}
-            {!(csvData && isPreviewActive) && (
-            <div className="grid grid-cols-3 gap-6">
-              {/* Data Upload Section */}
-              <div className="col-span-2 bg-white rounded-xl shadow-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
+            {/* Only show upload and recent activity if no data is loaded OR we're in preview mode */}
+            {(!csvData || isPreviewActive) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Data Upload Section */}
+                <div 
+                  className={`relative bg-white rounded-xl shadow-card p-6 transition-all duration-200 ${
+                    dropzoneActive ? 'border-2 border-dashed border-primary bg-primary/5' : ''
+                  }`}
+                >
+                  <div className="mb-4">
                     <h2 className="text-lg font-semibold text-gray-800">Data Upload</h2>
                     <p className="text-sm text-gray-600">Upload your CSV files</p>
                   </div>
-                </div>
-                <div className="upload-container">
-                  {currentFileName && csvData && isPreviewActive ? (
-                    <div className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center bg-base-200">
-                      <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M5 13l4 4L19 7" />
-                        </svg>
+  
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".csv"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+  
+                  <div
+                    className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center cursor-pointer hover:bg-base-200/30 transition-colors"
+                    onClick={handleImportFile}
+                  >
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <div className="text-gray-600 font-medium">
+                        Drag and drop your CSV file here
                       </div>
-                      <div className="px-3 py-1 bg-base-100 rounded-md text-sm font-medium mb-2">
-                        {currentFileName}
-                      </div>
-                      <button 
-                        className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                        onClick={handleClearFile}
-                      >
-                        Remove file
-                      </button>
-                    </div>
-                  ) : (
-                    <div 
-                      className="flex flex-col items-center justify-center h-[200px] border border-gray-200 rounded-lg p-6 text-center cursor-pointer bg-base-200 transition-all hover:bg-base-200/70"
-                      onClick={handleImportFile}
-                    >
-                      <input 
-                        type="file" 
-                        ref={fileInputRef}
-                        className="hidden" 
-                        accept=".csv" 
-                        onChange={handleFileChange} 
-                      />
-                      <div className="flex flex-col items-center">
-                        <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                          </svg>
-                        </div>
-                        <p className="text-sm font-medium text-gray-600">Drag and drop your CSV file here</p>
-                        <p className="text-xs text-gray-500 mt-1">or click to browse files</p>
+                      <div className="text-xs text-gray-400">
+                        or click to browse
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Recent Activity Section */}
-              <div className="col-span-1 bg-white rounded-xl shadow-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
-                    <p className="text-sm text-gray-600">Previously loaded files</p>
                   </div>
                 </div>
-                {recentFiles.length > 0 ? (
-                  <div className="h-[200px] overflow-y-auto">
+  
+                {/* Recent Activity Section */}
+                <div className="bg-white rounded-xl shadow-card p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
+                      <p className="text-sm text-gray-600">Previously loaded files</p>
+                    </div>
+                    {/* Add Test File Button (only in development) */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <button 
+                        onClick={addTestFile}
+                        className="p-1 bg-base-200 rounded text-xs"
+                      >
+                        + Test
+                      </button>
+                    )}
+                  </div>
+                  {/* Recent Files List */}
+                  {recentFiles && recentFiles.length > 0 ? (
                     <div className="space-y-3">
                       {recentFiles.map((file) => (
                         <div 
                           key={file.id} 
-                          className="flex items-center p-3 bg-base-200 rounded-lg cursor-pointer hover:bg-base-200/80 transition-colors"
+                          className="flex items-center justify-between p-3 bg-base-100 rounded-lg hover:bg-base-200 cursor-pointer transition-colors"
                           onClick={() => handleReloadFile(file.path)}
                         >
-                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <div className="flex items-center space-x-3">
+                            <div className="text-primary">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-700">{file.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(file.timestamp).toLocaleDateString()} at {new Date(file.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            className="text-gray-400 hover:text-gray-600"
+                            onClick={(e) => handleRemoveFromRecent(e, file.id)}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-700 truncate">{file.name}</div>
-                            <div className="text-xs text-gray-500">{formatTimestamp(file.timestamp)}</div>
-                          </div>
-                          <div className="flex space-x-1">
-                            <button 
-                              className="p-1 text-primary hover:text-primary-focus"
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent triggering the parent onClick
-                                handleReloadFile(file.path);
-                              }}
-                              title="Reimport file"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            </button>
-                            <button 
-                              className="p-1 text-gray-400 hover:text-gray-600"
-                              onClick={(e) => handleRemoveFromRecent(e, file.id)}
-                              title="Remove from history"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
+                          </button>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[200px] text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <p className="text-sm text-gray-500 mb-1">No recent files</p>
-                    <p className="text-xs text-gray-400 text-center mb-4">Upload a file to get started</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[200px] text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      <p className="text-sm text-gray-500 mb-1">No recent files</p>
+                      <p className="text-xs text-gray-400 text-center mb-4">Upload a file to get started</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
             )}
             
+            {/* Preview Section */}
             {csvData && isPreviewActive && (
               <div className="bg-white rounded-xl shadow-card p-6">
-                {/* Preview Section */}
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800">

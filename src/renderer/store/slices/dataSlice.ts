@@ -7,7 +7,8 @@ interface RecentFile {
   timestamp: number;
 }
 
-interface DataState {
+// Export DataState interface
+export interface DataState {
   csvData: {
     headers: string[];
     rows: string[][];
@@ -21,7 +22,8 @@ interface DataState {
   isPreviewActive: boolean;
 }
 
-const initialState: DataState = {
+// Export initialState constant
+export const initialState: DataState = {
   csvData: null,
   filteredData: null,
   isLoading: false,

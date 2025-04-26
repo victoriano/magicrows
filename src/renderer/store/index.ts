@@ -3,7 +3,7 @@ import { combineReducers } from 'redux';
 import { persistStore, persistReducer, createTransform, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import electronStorage from './electronStorage';
 import configReducer from './slices/configSlice';
-import dataReducer from './slices/dataSlice';
+import dataReducer, { DataState, initialState as dataInitialState } from './slices/dataSlice';
 import processingReducer from './slices/processingSlice';
 import resultsReducer from './slices/resultsSlice';
 import providerReducer from './slices/providerSlice';
@@ -38,12 +38,30 @@ const processingStateTransform = createTransform(
   { whitelist: ['aiEnrichment'] }
 );
 
+// Create a new transform for the data slice
+const dataTransform = createTransform(
+  // Only save recentFiles when serializing
+  (inboundState: DataState, key) => {
+    console.log(`[dataTransform] Serializing state for key: ${String(key)}`);
+    return { recentFiles: inboundState.recentFiles };
+  },
+  // Merge saved recentFiles with initial state on rehydration
+  (outboundState: { recentFiles: DataState['recentFiles'] }, key) => {
+    console.log(`[dataTransform] Rehydrating state for key: ${String(key)}`);
+    // Ensure outboundState and recentFiles exist
+    const recentFiles = outboundState?.recentFiles || [];
+    return { ...dataInitialState, recentFiles: recentFiles };
+  },
+  // Apply this transform only to the 'data' slice
+  { whitelist: ['data'] }
+);
+
 // Configure persistence settings
 const persistConfig = {
   key: 'root',
   storage: electronStorage,
-  whitelist: ['data', 'providers', 'aiEnrichment'], // Persist data, providers, and AI enrichment
-  transforms: [processingStateTransform], // Apply our transform
+  whitelist: ['data', 'providers', 'aiEnrichment'],
+  transforms: [processingStateTransform, dataTransform],
   debug: true, // Enable debug mode for Redux persist
 };
 
@@ -72,7 +90,10 @@ export const store = configureStore({
 store.subscribe(() => {
   const state = store.getState();
   console.log('Redux state updated:', {
-    providers: state.providers.providers.length
+    providers: state.providers?.providers?.length ?? 'undefined',
+    data_csvData_exists: !!state.data?.csvData,
+    data_recentFiles_count: state.data?.recentFiles?.length ?? 0,
+    data_isPreviewActive: state.data?.isPreviewActive
   });
 });
 

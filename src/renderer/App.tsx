@@ -779,15 +779,6 @@ const App: React.FC = () => {
                       <h2 className="text-lg font-semibold text-gray-800">Recent Activity</h2>
                       <p className="text-sm text-gray-600">Previously loaded files</p>
                     </div>
-                    {/* Add Test File Button (only in development) */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <button 
-                        onClick={addTestFile}
-                        className="p-1 bg-base-200 rounded text-xs"
-                      >
-                        + Test
-                      </button>
-                    )}
                   </div>
                   {/* Recent Files List */}
                   {recentFiles && recentFiles.length > 0 ? (

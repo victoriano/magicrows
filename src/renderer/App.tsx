@@ -894,6 +894,18 @@ const App: React.FC = () => {
                   >
                     <div className="flex items-center justify-between mb-4 relative">
                       <div className="flex items-center space-x-4">
+                        {/* Filename and dropdown will be moved to DatasetSelector section */}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                      </div>
+                    </div>
+                    
+                    {/* Processing Status Indicator */}
+                    <ProcessingStatusIndicator />
+                    
+                    {/* Dataset/Export controls with filename and dropdown */}
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center space-x-4">
                         {/* Group Filename and Dropdown */}
                         <div className="flex items-center space-x-2">
                           <h2 className="text-lg font-semibold text-gray-800">
@@ -920,21 +932,13 @@ const App: React.FC = () => {
                             </ul>
                           </div>
                         </div>
+                        {/* DatasetSelector with Badge */}
+                        <DatasetSelector 
+                          onExport={handleExportCsv} 
+                          rowCount={displayRows.length} 
+                          columnCount={displayHeaders.length} 
+                        />
                       </div>
-                      <div className="flex items-center space-x-2">
-                      </div>
-                    </div>
-                    
-                    {/* Processing Status Indicator */}
-                    <ProcessingStatusIndicator />
-                    
-                    {/* Dataset/Export controls */}
-                    <div className="flex justify-between items-center mb-4">
-                      <DatasetSelector 
-                        onExport={handleExportCsv} 
-                        rowCount={displayRows.length} 
-                        columnCount={displayHeaders.length} 
-                      />
                       
                       {/* AI Enrichment Toggle Button */}
                       <button

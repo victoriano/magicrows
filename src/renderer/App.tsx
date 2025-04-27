@@ -904,10 +904,14 @@ const App: React.FC = () => {
                           <h2 className="text-lg font-semibold text-gray-800">
                             {currentFileName || 'Loaded Data'}
                           </h2>
-                          {/* Dropdown Menu (Three Dots) */}
+                          {/* Dropdown Menu (Vertical Three Dots) */}
                           <div className="dropdown dropdown-end">
-                            <label tabIndex={0} className="btn btn-ghost btn-circle btn-sm">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                            <label tabIndex={0} className="btn btn-ghost px-2 py-3 h-auto min-h-0 flex items-center justify-center rounded-md hover:bg-gray-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="5" r="1"></circle>
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="12" cy="19" r="1"></circle>
+                              </svg>
                             </label>
                             <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
                               <li>

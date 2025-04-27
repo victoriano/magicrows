@@ -13,7 +13,7 @@ import {
 } from './store/slices/providerSlice';
 import { RootState, AppDispatch, persistor } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp, markPreviewAsImported } from './store/slices/dataSlice';
-import { loadExternalPresets, setActiveDataset } from './store/slices/aiEnrichmentSlice';
+import { loadExternalPresets, setActiveDataset, resetEnrichmentState } from './store/slices/aiEnrichmentSlice';
 import Papa from 'papaparse';
 // @ts-ignore - This file exists at runtime, ignore TypeScript error
 import magicRowsLogo from '../assets/magicrows_logo.png';
@@ -922,6 +922,7 @@ const App: React.FC = () => {
                                   className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-100 rounded-md transition-colors flex items-center"
                                   onClick={() => {
                                     dispatch(clearData());
+                                    dispatch(resetEnrichmentState()); // Reset AI enrichment state when replacing dataset
                                     setShowDataOptions(false); // Close dropdown after action
                                   }}
                                 >

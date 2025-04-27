@@ -823,16 +823,16 @@ const App: React.FC = () => {
             {csvData && isPreviewActive && (
               <div className="bg-white rounded-xl shadow-card p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <div>
+                  <div className="flex items-center space-x-3">
                     <h2 className="text-lg font-semibold text-gray-800">
                       Preview {currentFileName && <span className="font-normal text-gray-600 ml-2">- {currentFileName}</span>}
                     </h2>
-                  </div>
-                  <div className="flex items-center space-x-2">
                     {/* Badge showing row and column count */}
                     <div className="badge badge-outline text-xs font-normal py-3">
                       {csvData.rows.length} rows × {csvData.headers.length} columns
                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <button 
                       className="px-4 py-2 bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus"
                       onClick={() => {

@@ -971,13 +971,10 @@ const App: React.FC = () => {
                         <button
                           className={`tab min-w-[6rem] px-4 ${
                             aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-gray-100'
-                          } transition-all duration-200 ${
-                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-800'
-                          }`}
+                          } transition-all duration-200 hover:bg-gray-200 hover:text-gray-800`}
                           onClick={() => {
                             dispatch(setActiveDataset('original'));
                           }}
-                          disabled={!aiEnrichment?.result}
                         >
                           Original
                         </button>

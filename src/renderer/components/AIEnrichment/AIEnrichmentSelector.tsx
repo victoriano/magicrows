@@ -145,24 +145,6 @@ const AIEnrichmentSelector: React.FC = () => {
       <h3 className="font-medium mb-3">AI Enrichment</h3>
       
       <div className="flex flex-col space-y-3">
-        {/* Step indicator */}
-        <div className="flex items-center text-xs text-gray-500 mb-1">
-          <div className="flex items-center">
-            <span className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center mr-1">1</span>
-            <span className="font-medium">Select Task</span>
-          </div>
-          <span className="mx-2">→</span>
-          <div className="flex items-center">
-            <span className={`w-5 h-5 rounded-full ${selectedPreset ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'} flex items-center justify-center mr-1`}>2</span>
-            <span className={selectedPreset ? 'font-medium' : ''}>Select Provider</span>
-          </div>
-          <span className="mx-2">→</span>
-          <div className="flex items-center">
-            <span className={`w-5 h-5 rounded-full ${selectedProviderId ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'} flex items-center justify-center mr-1`}>3</span>
-            <span className={selectedProviderId ? 'font-medium' : ''}>Process</span>
-          </div>
-        </div>
-        
         {/* AI Enrichment Preset Selector */}
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -226,8 +208,8 @@ const AIEnrichmentSelector: React.FC = () => {
 
             {/* Enrichment details section */}
             <div className="bg-white rounded-md p-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
+              <div> 
+                <div className="mb-1"> 
                   <span className="text-gray-500">Provider:</span>
                   <span className="ml-1 font-medium">
                     {selectedProviderId ? 
@@ -235,15 +217,15 @@ const AIEnrichmentSelector: React.FC = () => {
                       isLoadingProviders ? "Loading..." : "Not selected"}
                   </span>
                 </div>
-                <div>
+                <div className="mb-1"> 
                   <span className="text-gray-500">Model:</span>
                   <span className="ml-1 font-medium">{selectedPreset.config.model}</span>
                 </div>
-                <div>
+                <div className="mb-1"> 
                   <span className="text-gray-500">Mode:</span>
                   <span className="ml-1 font-medium capitalize">{selectedPreset.config.mode}</span>
                 </div>
-                <div>
+                <div className="mb-1"> 
                   <span className="text-gray-500">Output Format:</span>
                   <span className="ml-1 font-medium">
                     {selectedPreset.config.outputFormat === 'newColumns' ? 'New Columns' : 'New Rows'}

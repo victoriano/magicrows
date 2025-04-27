@@ -702,7 +702,7 @@ const App: React.FC = () => {
         className="sticky top-0 z-10 bg-base-100 py-5 px-6 pt-3"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="container mx-auto flex justify-between items-center">
+        <div className="mx-auto flex justify-between items-center">
           {/* Add pl-[70px] to push content past macOS controls */}
           <div className="flex items-center pl-[70px]">
             <img src={magicRowsLogo} alt="MagicRows Logo" className="h-8 mr-2" />
@@ -730,7 +730,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="container mx-auto py-6 px-4 flex flex-col gap-6">
+      <main className="mx-auto py-6 px-4 flex flex-col gap-6">
         {activeTab === 'data' && (
           <div className="space-y-6">
             {/* Only show upload and recent activity if no data is loaded at all */}
@@ -982,7 +982,7 @@ const App: React.FC = () => {
                   
                   {/* AI Panel - integrated in flex layout */}
                   {isAIPanelOpen && (
-                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] transition-all duration-300 overflow-hidden flex-shrink-0 min-w-0">
+                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] lg:w-[384px] xl:w-[448px] transition-all duration-300 overflow-hidden flex-shrink-0 min-w-0">
                       {/* Panel Header */}
                       <div className="flex items-center justify-between p-4 border-b">
                         <h3 className="font-semibold text-gray-800">AI Enrichment</h3>
@@ -1182,7 +1182,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-4 bg-base-100 mt-auto">
-        <div className="container mx-auto px-6 text-center text-sm text-gray-500">
+        <div className="mx-auto px-6 text-center text-sm text-gray-500">
           <p>MagicRows &copy; {new Date().getFullYear()} | Version 0.1.0</p>
         </div>
       </footer>

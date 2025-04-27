@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAIEnrichment } from '../../hooks/useAIEnrichment';
+import { useDispatch } from 'react-redux';
+import { resetStatus } from '../../store/slices/aiEnrichmentSlice';
 
 /**
  * Component to display the current processing status of AI enrichment
  */
 const ProcessingStatusIndicator: React.FC = () => {
+  const dispatch = useDispatch();
   const { 
     status, 
     error,
@@ -32,13 +35,15 @@ const ProcessingStatusIndicator: React.FC = () => {
       if (localStorage.getItem(shownMessageKey)) {
         // We've already shown this message
         hasShownSuccessMessage.current = true;
+        // Reset the status in the Redux store
+        dispatch(resetStatus());
       } else if (status === 'success') {
         // Mark this message as shown
         localStorage.setItem(shownMessageKey, 'true');
         hasShownSuccessMessage.current = false;
       }
     }
-  }, [enrichmentResult, status]);
+  }, [enrichmentResult, status, dispatch]);
 
   // Function to initiate the fade-out and subsequent unmount
   const startFadeOut = useCallback(() => {
@@ -49,8 +54,10 @@ const ProcessingStatusIndicator: React.FC = () => {
     // Set a timer to remove the component from DOM after the animation
     unmountTimerRef.current = setTimeout(() => {
       setShouldRender(false);
+      // Reset status in Redux store
+      dispatch(resetStatus());
     }, animationDuration);
-  }, [animationDuration]); // animationDuration is constant, so this is stable
+  }, [animationDuration, dispatch]); // Added dispatch to dependencies
 
   // Effect to manage visibility based on status
   useEffect(() => {
@@ -65,6 +72,8 @@ const ProcessingStatusIndicator: React.FC = () => {
       // If we've already shown the success message for this result, don't show it again
       setIsVisible(false);
       setShouldRender(false);
+      // Reset status in Redux store
+      dispatch(resetStatus());
     } else {
       // For processing, error, or new success, ensure it's rendered and visible
       setShouldRender(true);
@@ -84,8 +93,17 @@ const ProcessingStatusIndicator: React.FC = () => {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
       if (unmountTimerRef.current) clearTimeout(unmountTimerRef.current);
     };
-  // Removed startFadeOut from dependencies as it's stable due to useCallback
-  }, [status, error]); 
+  }, [status, error, dispatch, startFadeOut]); 
+
+  // Component cleanup effect
+  useEffect(() => {
+    return () => {
+      // Reset status when component unmounts (e.g., when switching tabs)
+      if (status === 'success') {
+        dispatch(resetStatus());
+      }
+    };
+  }, [dispatch, status]);
 
   const handleClose = () => {
     // Clear potential auto-hide timer if manually closed

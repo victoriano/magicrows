@@ -149,8 +149,13 @@ const aiEnrichmentSlice = createSlice({
         // We keep the selection for user convenience, but reset any processing state
         console.log('Resetting AI enrichment state but preserving preset selection');
       } else {
-        console.log('Resetting AI enrichment state completely');
+        console.log('Completely resetting AI enrichment state');
       }
+    },
+    
+    resetStatus: (state) => {
+      // Only reset the status to idle, preserving all other state
+      state.status = 'idle';
     },
     
     addPreset: (state, action: PayloadAction<EnrichmentPreset>) => {
@@ -217,6 +222,7 @@ export const {
   clearSelection,
   setActiveDataset,
   resetEnrichmentState,
+  resetStatus,
   addPreset,
   updatePreset,
   removePreset

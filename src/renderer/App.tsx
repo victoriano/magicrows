@@ -957,9 +957,9 @@ const App: React.FC = () => {
                       <div className="tabs">
                         <button
                           className={`tab min-w-[6rem] px-4 ${
-                            aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-base-200'
+                            aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-gray-100'
                           } transition-all duration-200 ${
-                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'
+                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-800'
                           }`}
                           onClick={() => {
                             dispatch(setActiveDataset('original'));
@@ -970,9 +970,9 @@ const App: React.FC = () => {
                         </button>
                         <button
                           className={`tab min-w-[6rem] px-4 ${
-                            aiEnrichment?.activeDataset === 'enriched' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-base-200'
+                            aiEnrichment?.activeDataset === 'enriched' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-gray-100'
                           } transition-all duration-200 ${
-                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'
+                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-800'
                           }`}
                           onClick={() => {
                             dispatch(setActiveDataset('enriched'));

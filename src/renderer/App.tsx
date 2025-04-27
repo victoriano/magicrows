@@ -13,7 +13,7 @@ import {
 } from './store/slices/providerSlice';
 import { RootState, AppDispatch, persistor } from './store';
 import { setData, setLoading, removeRecentFile, clearData, setRecentFiles, updateFileTimestamp, markPreviewAsImported } from './store/slices/dataSlice';
-import { loadExternalPresets } from './store/slices/aiEnrichmentSlice';
+import { loadExternalPresets, setActiveDataset } from './store/slices/aiEnrichmentSlice';
 import Papa from 'papaparse';
 // @ts-ignore - This file exists at runtime, ignore TypeScript error
 import magicRowsLogo from '../assets/magicrows_logo.png';
@@ -950,6 +950,38 @@ const App: React.FC = () => {
                         </svg>
                         <span>AI Enrichment</span>
                       </button>
+                    </div>
+                    
+                    {/* Dataset Tabs - Moved right above the table */}
+                    <div className="flex justify-between items-center mb-2 border-b border-gray-200">
+                      <div className="tabs">
+                        <button
+                          className={`tab min-w-[6rem] px-4 ${
+                            aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-base-200'
+                          } transition-all duration-200 ${
+                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'
+                          }`}
+                          onClick={() => {
+                            dispatch(setActiveDataset('original'));
+                          }}
+                          disabled={!aiEnrichment?.result}
+                        >
+                          Original
+                        </button>
+                        <button
+                          className={`tab min-w-[6rem] px-4 ${
+                            aiEnrichment?.activeDataset === 'enriched' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-base-200'
+                          } transition-all duration-200 ${
+                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'
+                          }`}
+                          onClick={() => {
+                            dispatch(setActiveDataset('enriched'));
+                          }}
+                          disabled={!aiEnrichment?.result}
+                        >
+                          Enriched
+                        </button>
+                      </div>
                     </div>
                     
                     {/* Existing Table Structure - contained scrolling */}

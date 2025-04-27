@@ -305,13 +305,16 @@ class Enricher:
              # Should be unreachable
              raise ValueError(f"Unsupported output format: {config.outputFormat}")
 
-    def _enrich_polars(
+    async def _enrich_polars(
         self,
-        df: PolarsDataFrame,
+        df: 'pl.DataFrame',
         config: AIEnrichmentBlockConfig,
         provider_conf: BaseProviderConfig
-    ) -> PolarsDataFrame:
-        """Handles enrichment specifically for Polars DataFrames."""
+    ) -> 'pl.DataFrame':
+        """Enrichment logic specifically for Polars DataFrames."""
+        import polars as pl # Dynamic import
+        from jinja2 import Environment
+
         logger.info(f"Processing {len(df)} rows with polars.")
 
         if pl is None:
@@ -394,34 +397,84 @@ class Enricher:
              logger.warning("No results were generated.")
              return df.clone() # Return original if no rows processed/succeeded
         
-        # Construct results DataFrame. Polars can infer schema.
-        # Note: If preserving original index is crucial and complex, alignment might be needed.
-        # For simple head() processing or full processing, creating a new DF is usually fine.
-        results_df = pl.DataFrame(all_row_results)
-        
+        output_column_names = [o.name for o in config.outputs]
+
         if config.outputFormat == OutputFormat.NEW_COLUMNS:
             logger.info("Merging results as new columns (Polars).")
             # Check if we only processed a preview
             if config.mode == RunMode.PREVIEW:
                  # Create null columns for the rest of the DataFrame
-                 null_columns = {col: pl.lit(None).cast(results_df[col].dtype) for col in results_df.columns}
+                 null_columns = {col: pl.lit(None).cast(pl.DataFrame(all_row_results).schema[col].dtype) for col in pl.DataFrame(all_row_results).columns}
                  # Combine results with nulls for the tail
                  results_aligned_df = pl.concat([
-                      results_df,
+                      pl.DataFrame(all_row_results),
                       pl.DataFrame(null_columns).lazy().fetch(len(df) - len(process_df))
                  ])
                  output_df = df.hstack(results_aligned_df) # Horizontal stack
             else:
                  # Full processing, results_df matches length of df
-                 output_df = df.hstack(results_df)
+                 output_df = df.hstack(pl.DataFrame(all_row_results))
                  
             return output_df
         elif config.outputFormat == OutputFormat.NEW_ROWS:
-            logger.error(f"Output format '{config.outputFormat.value}' is not yet implemented for polars.")
-            # TODO: Implement NEW_ROWS logic for Polars
-            # - Use explode() on list columns
-            # - Requires careful joining/handling
-            return df.clone()
+            logger.info("Generating new rows from results (Polars).")
+            new_rows_list = []
+
+            processed_input_df = df.head(len(all_row_results)) # Get the part of the df that was processed
+
+            for i, row_result in enumerate(all_row_results):
+                original_row = processed_input_df.row(i, named=True) # Get original row as dict
+                context_data = {col: original_row[col] for col in config.contextColumns}
+
+                # --- Prepare lists of values for Cartesian product --- 
+                output_values_for_product = []
+                output_names_in_product_order = []
+
+                for output_conf in config.outputs:
+                    output_name = output_conf.name
+                    result_value = row_result.get(output_name)
+                    values_to_process = [] # List to hold values for this output for the product
+                    if result_value is None:
+                        values_to_process = [None]
+                    elif output_conf.outputCardinality == OutputCardinality.MULTIPLE and isinstance(result_value, list):
+                        values_to_process = result_value if result_value else [None]
+                    elif output_conf.outputCardinality == OutputCardinality.SINGLE:
+                        values_to_process = [result_value]
+                    elif result_value is not None: # MULTIPLE but not a list
+                        logger.warning(
+                            f"Output '{output_name}' is MULTIPLE but result is not a list (Polars) (value: {result_value}). Treating as single."
+                        )
+                        values_to_process = [result_value]
+                    else:
+                       values_to_process = [None]
+
+                    output_values_for_product.append(values_to_process)
+                    output_names_in_product_order.append(output_name)
+
+                # --- Generate rows using Cartesian product --- 
+                if not output_values_for_product:
+                   continue 
+
+                combinations = itertools.product(*output_values_for_product)
+
+                for combo in combinations:
+                    new_row = context_data.copy()
+                    for name, value in zip(output_names_in_product_order, combo):
+                        new_row[name] = value # Polars handles None correctly
+                    new_rows_list.append(new_row)
+
+            if not new_rows_list:
+                logger.warning("No new rows were generated from the results (Polars).")
+                ordered_columns = config.contextColumns + output_column_names
+                return pl.DataFrame({col: [] for col in ordered_columns}) # Empty DF with schema
+
+            output_df = pl.from_dicts(new_rows_list) # Create DataFrame from list of dicts
+            # Ensure correct column order
+            ordered_columns = config.contextColumns + output_column_names
+            # Select columns in the desired order, handling potential missing columns
+            existing_ordered_columns = [col for col in ordered_columns if col in output_df.columns]
+            output_df = output_df.select(existing_ordered_columns)
+            return output_df
         else:
              raise ValueError(f"Unsupported output format: {config.outputFormat}")
 

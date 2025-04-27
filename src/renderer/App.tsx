@@ -837,7 +837,6 @@ const App: React.FC = () => {
                     </h2>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-500">{csvData.rows.length} rows total</span>
                     <button 
                       className="px-4 py-2 text-sm bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus"
                       onClick={() => {
@@ -929,7 +928,6 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{csvData.rows.length} rows</span>
                       </div>
                     </div>
                     
@@ -938,7 +936,11 @@ const App: React.FC = () => {
                     
                     {/* Dataset/Export controls */}
                     <div className="flex justify-between items-center mb-4">
-                      <DatasetSelector onExport={handleExportCsv} />
+                      <DatasetSelector 
+                        onExport={handleExportCsv} 
+                        rowCount={displayRows.length} 
+                        columnCount={displayHeaders.length} 
+                      />
                       
                       {/* AI Enrichment Toggle Button */}
                       <button

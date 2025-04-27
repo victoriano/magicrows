@@ -4,12 +4,14 @@ import { useAIEnrichment } from '../../hooks/useAIEnrichment';
 // Add props to allow passing handler from parent
 interface DatasetSelectorProps {
   onExport?: () => void;
+  rowCount?: number;
+  columnCount?: number;
 }
 
 /**
  * Component for switching between original and enriched datasets
  */
-const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
+const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport, rowCount = 0, columnCount = 0 }) => {
   const {
     hasEnrichedData,
     isShowingEnrichedData,
@@ -22,7 +24,9 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ onExport }) => {
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center space-x-3">
-        <span className="text-sm font-medium">Dataset view:</span>
+        <div className="badge badge-outline text-xs font-normal py-3">
+          {rowCount} rows × {columnCount} columns
+        </div>
         <div className="tabs ml-2 border-b-0">
           <button
             className={`tab min-w-[6rem] px-4 ${!isShowingEnrichedData ? 'tab-active bg-white shadow-sm' : 'bg-base-200'} transition-all duration-200 ${(isProcessing || !hasEnrichedData) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-300'}`}

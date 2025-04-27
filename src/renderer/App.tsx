@@ -1012,7 +1012,7 @@ const App: React.FC = () => {
           </div>
         )}
         {activeTab === 'settings' && (
-          <div className="col-span-1 md:col-span-2 lg:col-span-3">
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 max-w-5xl mx-auto">
             <div className="bg-white rounded-xl shadow-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>

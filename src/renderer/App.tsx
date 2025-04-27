@@ -828,7 +828,7 @@ const App: React.FC = () => {
                       Preview {currentFileName && <span className="font-normal text-gray-600 ml-2">- {currentFileName}</span>}
                     </h2>
                     {/* Badge showing row and column count */}
-                    <div className="badge badge-outline text-xs font-normal py-3">
+                    <div className="bg-gray-100 text-gray-600 text-xs font-normal py-2 px-3 rounded">
                       {csvData.rows.length} rows × {csvData.headers.length} columns
                     </div>
                   </div>
@@ -953,7 +953,7 @@ const App: React.FC = () => {
                           columnCount={displayHeaders.length} 
                         />
                         {/* Row/Column Count Badge */}
-                        <div className="badge badge-outline text-xs font-normal py-3">
+                        <div className="bg-gray-100 text-gray-600 text-xs font-normal py-2 px-3 rounded">
                           {displayRows.length} rows × {displayHeaders.length} columns
                         </div>
                       </div>

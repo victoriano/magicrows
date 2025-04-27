@@ -905,18 +905,14 @@ const App: React.FC = () => {
                             {currentFileName || 'Loaded Data'}
                           </h2>
                           {/* Dropdown Menu (Vertical Three Dots) */}
-                          <div className="dropdown dropdown-end">
+                          <div className="dropdown dropdown-right">
                             <label tabIndex={0} className="btn btn-ghost px-2 py-3 h-auto min-h-0 flex items-center justify-center rounded-md hover:bg-gray-100">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="5" r="1"></circle>
-                                <circle cx="12" cy="12" r="1"></circle>
-                                <circle cx="12" cy="19" r="1"></circle>
-                              </svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                             </label>
-                            <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
+                            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-white rounded-lg border border-gray-200 w-52 z-50">
                               <li>
                                 <button 
-                                  className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-100"
+                                  className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-100 rounded-md transition-colors"
                                   onClick={() => {
                                     dispatch(clearData());
                                     setShowDataOptions(false); // Close dropdown after action
@@ -1038,18 +1034,18 @@ const App: React.FC = () => {
                                   className="p-1 rounded-md hover:bg-base-200"
                                   onClick={() => toggleDropdown(provider.id)}
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
                                 </button>
                                 {showDropdown === provider.id && (
                                   <div className="absolute right-0 mt-1 w-36 bg-white border rounded-md shadow-md z-10">
                                     <button 
-                                      className="w-full px-4 py-2 text-sm text-left text-blue-600 hover:bg-gray-100"
+                                      className="w-full px-4 py-2 text-sm text-left text-blue-600 hover:bg-gray-100 rounded-md transition-colors"
                                       onClick={() => handleEditProvider(provider.id)}
                                     >
                                       Edit
                                     </button>
                                     <button 
-                                      className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-gray-100"
+                                      className="w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-gray-100 rounded-md transition-colors"
                                       onClick={() => handleRemoveProvider(provider.id)}
                                     >
                                       Remove

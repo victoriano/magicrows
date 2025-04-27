@@ -966,12 +966,12 @@ const App: React.FC = () => {
                     </div>
                     
                     {/* Dataset Tabs - Moved right above the table */}
-                    <div className="flex justify-between items-center mb-2 border-b border-gray-200">
+                    <div className="flex justify-between items-center border-b-0">
                       <div className="tabs">
                         <button
-                          className={`tab min-w-[6rem] px-4 ${
-                            aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-gray-100'
-                          } transition-all duration-200 hover:bg-gray-200 hover:text-gray-800`}
+                          className={`tab min-w-[6rem] px-4 rounded-b-none ${
+                            aiEnrichment?.activeDataset === 'original' ? 'tab-active bg-base-100 shadow-sm border-t border-x border-primary/30' : 'bg-base-200'
+                          } transition-all duration-200 hover:bg-base-200/80 hover:text-base-content`}
                           onClick={() => {
                             dispatch(setActiveDataset('original'));
                           }}
@@ -979,10 +979,10 @@ const App: React.FC = () => {
                           Original
                         </button>
                         <button
-                          className={`tab min-w-[6rem] px-4 ${
-                            aiEnrichment?.activeDataset === 'enriched' ? 'tab-active bg-white shadow-sm border-b-2 border-primary' : 'bg-gray-100'
+                          className={`tab min-w-[6rem] px-4 rounded-b-none ${
+                            aiEnrichment?.activeDataset === 'enriched' ? 'tab-active bg-base-100 shadow-sm border-t border-x border-primary/30' : 'bg-base-200'
                           } transition-all duration-200 ${
-                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 hover:text-gray-800'
+                            (!aiEnrichment?.result) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-base-200/80 hover:text-base-content'
                           }`}
                           onClick={() => {
                             dispatch(setActiveDataset('enriched'));

@@ -9,7 +9,8 @@ const ProcessingStatusIndicator: React.FC = () => {
     status, 
     error,
     selectedPreset,
-    processingMetrics
+    processingMetrics,
+    enrichmentResult
   } = useAIEnrichment();
 
   const [isVisible, setIsVisible] = useState(true);
@@ -17,6 +18,27 @@ const ProcessingStatusIndicator: React.FC = () => {
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const unmountTimerRef = useRef<NodeJS.Timeout | null>(null);
   const animationDuration = 2000; // Match CSS duration
+  
+  // Use a ref to track if we've shown the success message for this enrichment result
+  const hasShownSuccessMessage = useRef(false);
+
+  // Check if we've already shown the success message for this result
+  useEffect(() => {
+    // When a new enrichment result appears, reset our tracking
+    if (enrichmentResult) {
+      const resultId = enrichmentResult.timestamp || Date.now();
+      const shownMessageKey = `shown_message_${resultId}`;
+      
+      if (localStorage.getItem(shownMessageKey)) {
+        // We've already shown this message
+        hasShownSuccessMessage.current = true;
+      } else if (status === 'success') {
+        // Mark this message as shown
+        localStorage.setItem(shownMessageKey, 'true');
+        hasShownSuccessMessage.current = false;
+      }
+    }
+  }, [enrichmentResult, status]);
 
   // Function to initiate the fade-out and subsequent unmount
   const startFadeOut = useCallback(() => {
@@ -39,13 +61,18 @@ const ProcessingStatusIndicator: React.FC = () => {
     if (status === 'idle' && !error) {
       setIsVisible(false); // Hide immediately
       setShouldRender(false); // Unmount immediately
+    } else if (status === 'success' && hasShownSuccessMessage.current) {
+      // If we've already shown the success message for this result, don't show it again
+      setIsVisible(false);
+      setShouldRender(false);
     } else {
-      // For processing, error, or success, ensure it's rendered and visible
+      // For processing, error, or new success, ensure it's rendered and visible
       setShouldRender(true);
       setIsVisible(true);
       
       // If success, start the 5-second auto-hide timer
       if (status === 'success') {
+        hasShownSuccessMessage.current = true; // Mark that we've shown this message
         hideTimerRef.current = setTimeout(() => {
           startFadeOut(); // Trigger the fade-out process
         }, 5000); // Auto-hide starts after 5 seconds
@@ -64,6 +91,13 @@ const ProcessingStatusIndicator: React.FC = () => {
     // Clear potential auto-hide timer if manually closed
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     startFadeOut(); // Manually trigger fade-out
+    
+    // Remember that we've closed this message
+    if (enrichmentResult) {
+      const resultId = enrichmentResult.timestamp || Date.now();
+      localStorage.setItem(`shown_message_${resultId}`, 'true');
+      hasShownSuccessMessage.current = true;
+    }
   };
 
   // Only render if shouldRender is true

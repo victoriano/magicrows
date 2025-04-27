@@ -892,9 +892,11 @@ const App: React.FC = () => {
             {csvData && !isPreviewActive && (
               <div>
                 {/* Wrapper for content and panel with flex layout */}
-                <div className="flex flex-col md:flex-row gap-4 w-full overflow-hidden">
+                <div className="flex flex-col md:flex-row gap-4 w-full overflow-hidden pb-3">
                   {/* Main content container */}
-                  <div className={`bg-white rounded-xl shadow-card p-6 flex-1 transition-all duration-300 min-w-0`}>
+                  <div className={`bg-white rounded-xl shadow-card p-6 flex-1 transition-all duration-300 min-w-0`}
+                    style={{ maxHeight: 'calc(100vh - 140px)' }}
+                  >
                     <div className="flex items-center justify-between mb-4 relative">
                       <div>
                         {/* Display Filename */}
@@ -954,8 +956,8 @@ const App: React.FC = () => {
                     </div>
  
                     {/* Existing Table Structure - contained scrolling */}
-                    <div className="overflow-x-auto w-full" style={{ maxWidth: '100%' }}>
-                      <div className="max-h-[60vh] overflow-y-auto">
+                    <div className="overflow-x-auto w-full h-full">
+                      <div className="overflow-y-auto h-full">
                         <table className="w-full text-sm">
                           <thead className="bg-base-200 text-left sticky top-0 z-10">
                             <tr>
@@ -982,7 +984,9 @@ const App: React.FC = () => {
                   
                   {/* AI Panel - integrated in flex layout */}
                   {isAIPanelOpen && (
-                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] lg:w-[384px] xl:w-[448px] transition-all duration-300 overflow-hidden flex-shrink-0 min-w-0">
+                    <div className="bg-white rounded-xl shadow-card p-0 md:w-[320px] lg:w-[384px] xl:w-[448px] transition-all duration-300 overflow-hidden flex-shrink-0 min-w-0"
+                      style={{ maxHeight: 'calc(100vh - 140px)' }}
+                    >
                       {/* Panel Header */}
                       <div className="flex items-center justify-between p-4 border-b">
                         <h3 className="font-semibold text-gray-800">AI Enrichment</h3>
@@ -997,7 +1001,7 @@ const App: React.FC = () => {
                       </div>
                       
                       {/* Panel Content - AI Enrichment Selector */}
-                      <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+                      <div className="p-4 h-full overflow-y-auto">
                         <AIEnrichmentSelector />
                       </div>
                     </div>
@@ -1180,12 +1184,6 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
-
-      <footer className="py-4 bg-base-100 mt-auto">
-        <div className="mx-auto px-6 text-center text-sm text-gray-500">
-          <p>MagicRows &copy; {new Date().getFullYear()} | Version 0.1.0</p>
-        </div>
-      </footer>
 
       {/* Add Provider Modal */}
       {showAddProviderModal && (

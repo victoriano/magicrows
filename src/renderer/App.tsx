@@ -898,41 +898,35 @@ const App: React.FC = () => {
                     style={{ maxHeight: 'calc(100vh - 140px)' }}
                   >
                     <div className="flex items-center justify-between mb-4 relative">
-                      <div>
-                        {/* Display Filename */}
-                        <h2 className="text-lg font-semibold text-gray-800 truncate pr-2">
-                          {currentFileName || 'Loaded Data'}
-                        </h2>
-                      </div>
- 
-                      {/* Options Button (Three Dots) */}
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{csvData.rows.length} rows</span> {/* Keep row count */}
-                        <button
-                          onClick={() => setShowDataOptions(!showDataOptions)}
-                          className="p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          aria-label="Data options"
-                        >
-                          {/* Basic Three Dots SVG Icon */}
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
- 
-                        {/* Dropdown Menu */}
-                        {showDataOptions && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 z-10 top-full">
-                            <button
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                              onClick={() => {
-                                dispatch(clearData());
-                                setShowDataOptions(false); // Close dropdown after action
-                              }}
-                            >
-                              Replace Dataset
-                            </button>
+                      <div className="flex items-center space-x-4">
+                        {/* Group Filename and Dropdown */}
+                        <div className="flex items-center space-x-2">
+                          <h2 className="text-lg font-semibold text-gray-800">
+                            {currentFileName || 'Loaded Data'}
+                          </h2>
+                          {/* Dropdown Menu (Three Dots) */}
+                          <div className="dropdown dropdown-end">
+                            <label tabIndex={0} className="btn btn-ghost btn-circle btn-sm">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                            </label>
+                            <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
+                              <li>
+                                <button 
+                                  className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-100"
+                                  onClick={() => {
+                                    dispatch(clearData());
+                                    setShowDataOptions(false); // Close dropdown after action
+                                  }}
+                                >
+                                  Replace Dataset
+                                </button>
+                              </li>
+                            </ul>
                           </div>
-                        )}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-500">{csvData.rows.length} rows</span>
                       </div>
                     </div>
                     
@@ -954,7 +948,7 @@ const App: React.FC = () => {
                         <span>AI Enrichment</span>
                       </button>
                     </div>
- 
+                    
                     {/* Existing Table Structure - contained scrolling */}
                     <div className="overflow-x-auto w-full h-full">
                       <div className="overflow-y-auto h-full">
@@ -995,7 +989,7 @@ const App: React.FC = () => {
                           className="p-1 rounded-full hover:bg-gray-100"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
                       </div>

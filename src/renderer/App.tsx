@@ -828,13 +828,13 @@ const App: React.FC = () => {
                       Preview {currentFileName && <span className="font-normal text-gray-600 ml-2">- {currentFileName}</span>}
                     </h2>
                   </div>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
                     {/* Badge showing row and column count */}
                     <div className="badge badge-outline text-xs font-normal py-3">
                       {csvData.rows.length} rows × {csvData.headers.length} columns
                     </div>
                     <button 
-                      className="px-4 py-2 text-sm bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus"
+                      className="px-4 py-2 bg-primary text-white rounded-md shadow-sm hover:bg-primary-focus"
                       onClick={() => {
                         dispatch(markPreviewAsImported());
                       }}
@@ -842,7 +842,7 @@ const App: React.FC = () => {
                       Import Data
                     </button>
                     <button 
-                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-md shadow-sm hover:bg-gray-300"
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md shadow-sm hover:bg-gray-300"
                       onClick={() => dispatch(clearData())}
                     >
                       Cancel
@@ -952,6 +952,10 @@ const App: React.FC = () => {
                           rowCount={displayRows.length} 
                           columnCount={displayHeaders.length} 
                         />
+                        {/* Row/Column Count Badge */}
+                        <div className="badge badge-outline text-xs font-normal py-3">
+                          {displayRows.length} rows × {displayHeaders.length} columns
+                        </div>
                       </div>
                       
                       {/* AI Enrichment Toggle Button */}

@@ -18,15 +18,9 @@ const DatasetSelector: React.FC<DatasetSelectorProps> = ({ rowCount = 0, columnC
     status
   } = useAIEnrichment();
 
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center space-x-3">
-        <div className="badge badge-outline text-xs font-normal py-3">
-          {rowCount} rows × {columnCount} columns
-        </div>
-      </div>
-    </div>
-  );
+  // Empty component - functionality moved to App.tsx
+  return null;
 };
 
 export default DatasetSelector;
+export { useAIEnrichment };

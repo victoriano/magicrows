@@ -223,15 +223,19 @@ class Enricher:
                     # Process the actual result from the provider
                     if result and field in result:
                         provider_data = result[field] # This is either the value or {"value": ..., "reasoning": ...}
+                        
                         if includes_reasoning:
                             if isinstance(provider_data, dict) and "value" in provider_data:
-                                row_result[field] = provider_data.get("value", pd.NA)
+                                # Extract nested value and reasoning
+                                nested_value_dict = provider_data.get("value", {})
+                                # The actual value is inside the nested dict, keyed by the field name
+                                row_result[field] = nested_value_dict.get(field, pd.NA) 
                                 row_result[f"{field}_reasoning"] = provider_data.get("reasoning", pd.NA)
                                 logger.debug(f"Stored value (w/ reasoning): '{row_result[field]}', Reasoning: '{row_result[f'{field}_reasoning']}'")
                             else:
-                                # Reasoning expected but not found in dict structure
-                                logger.warning(f"Reasoning enabled for {field}, but result structure unexpected: {provider_data}. Storing as value.")
-                                row_result[field] = provider_data # Store whatever was returned
+                                # Reasoning expected but not found in correct structure
+                                logger.warning(f"Reasoning enabled for {field}, but result structure unexpected: {provider_data}. Storing raw data.")
+                                row_result[field] = provider_data # Store whatever was returned as value
                                 row_result[f"{field}_reasoning"] = pd.NA # Set reasoning to NA
                         else:
                             # Reasoning not enabled, store the direct value
@@ -414,15 +418,25 @@ class Enricher:
                     final_value = None
                     final_reasoning = None
 
-                    if isinstance(result_data, dict) and "value" in result_data:
-                        # Case: Reasoning was likely ON, result_data is {'value': ..., 'reasoning': ...}
-                        final_value = result_data.get("value")
-                        final_reasoning = result_data.get("reasoning")
+                    # Check if reasoning was included for this output
+                    if output_conf.includeReasoning:
+                        if isinstance(result_data, dict) and "value" in result_data:
+                            # Extract nested value and reasoning
+                            nested_value_dict = result_data.get("value", {})
+                            # The actual value is inside the nested dict, keyed by the field name
+                            final_value = nested_value_dict.get(output_name, None) 
+                            final_reasoning = result_data.get("reasoning")
+                        else:
+                             # Reasoning expected but not found in correct structure
+                            logger.warning(f"Reasoning ON for {output_name} (Polars), but structure unexpected: {result_data}. Storing raw data.")
+                            final_value = result_data # Store whatever was returned
+                            # final_reasoning remains None
                     elif result_data is not None:
-                        # Case: Reasoning was OFF, result_data is the direct value
+                        # Reasoning was OFF, result_data is the direct value
                         final_value = result_data
                         # final_reasoning remains None
-
+                    # else: result_data is None, final_value/reasoning remain None
+                    
                     values.append(final_value)
                     if output_conf.includeReasoning:
                         reasonings.append(final_reasoning)

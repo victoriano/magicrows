@@ -54,6 +54,10 @@ class OutputConfig(BaseModel):
         alias="contextColumns",
         description="Specific context columns for this output, overriding block-level."
     )
+    includeReasoning: bool = Field(
+        default=True,
+        description="If True, requests the AI to provide reasoning for its answer for this output."
+    )
     # Note: strict_validation is not part of the config model itself,
     # but a processing parameter potentially.
 
@@ -101,4 +105,3 @@ class AIEnrichmentBlockConfig(BaseModel):
     class Config:
         populate_by_name = True # Allow camelCase field names from TS/JSON
         extra = 'forbid' 
-

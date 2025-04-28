@@ -3,11 +3,11 @@
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 from .models import AIEnrichmentBlockConfig
 
-def load_preset(ts_file_path: str | Path, config_variable_name: str) -> AIEnrichmentBlockConfig:
+def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AIEnrichmentBlockConfig:
     """Loads an AIEnrichmentBlockConfig from a TypeScript (.ts) preset file.
 
     Uses simple string/regex matching to find the variable assignment

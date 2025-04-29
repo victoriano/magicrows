@@ -11,9 +11,9 @@ import datetime
 
 # --- Configuration --- 
 # Adjust the path to your preset file if necessary
-# Assumes the script is run from the project root
-PRESET_FILE_PATH_TASKS = "src/shared/presets_library/ISCOTasks_preset.ts" 
-PRESET_FILE_PATH_NOVELTY = "src/shared/presets_library/ISCONovelty_preset.ts" 
+# Assuming the script is run from the project root
+PRESET_FILE_PATH_TASKS = "../presets/ISCOTasks_preset.ts" 
+PRESET_FILE_PATH_NOVELTY = "../presets/ISCONovelty_preset.ts" 
 # The variable name holding the config object inside the TS file
 CONFIG_VARIABLE_NAME_TASKS = "ISCOtasksConfig"
 CONFIG_VARIABLE_NAME_NOVELTY = "ISCONoveltyConfig"

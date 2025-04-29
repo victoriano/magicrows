@@ -7,10 +7,12 @@ from typing import Dict, Any, Union
 
 from .models import AIEnrichmentBlockConfig
 
-def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AIEnrichmentBlockConfig:
+def load_preset(ts_file_path: Union[str, Path]) -> AIEnrichmentBlockConfig:
     """Loads an AIEnrichmentBlockConfig from a TypeScript (.ts) preset file.
 
-    Uses simple string/regex matching to find the variable assignment
+    Assumes the file contains exactly one exported configuration object assigned
+    using `export const someName ... = { ... };`.
+    Uses simple string/regex matching to find the first such assignment
     and extracts the object literal, assuming it's JSON-compatible.
 
     WARNING: This is fragile and sensitive to formatting changes in the .ts file.
@@ -18,15 +20,13 @@ def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AI
 
     Args:
         ts_file_path: Path to the .ts file.
-        config_variable_name: The name of the exported config variable 
-                                (e.g., 'ISCOtasksConfig').
 
     Returns:
         An instance of AIEnrichmentBlockConfig.
 
     Raises:
         FileNotFoundError: If the ts_file_path does not exist.
-        ValueError: If the variable or a valid JSON object cannot be found/parsed.
+        ValueError: If a suitable config object export or a valid JSON object cannot be found/parsed.
         IOError: If the file cannot be read.
     """
     ts_path = Path(ts_file_path)
@@ -38,15 +38,18 @@ def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AI
     except Exception as e:
         raise IOError(f"Error reading TypeScript file {ts_path}: {e}") from e
 
-    # Attempt to find the start of the object literal assignment
-    # This regex looks for 'export const varName: Type = {' or 'varName = {' allowing whitespace
-    # It's intentionally kept simple and might need adjustment if TS format varies.
-    start_pattern = re.compile(rf"(?:export\s+const\s+)?{re.escape(config_variable_name)}(?:\s*:\s*\w+)?\s*=\s*\{{", re.MULTILINE)
+    # Attempt to find the start of the first object literal assignment matching the pattern:
+    # `export const anyVariableName ... = {`
+    # This regex looks for 'export const', captures the variable name, allows for an optional type hint,
+    # finds the equals sign, and expects an opening brace.
+    start_pattern = re.compile(r"export\s+const\s+(\w+)(?:\s*:\s*\w+)?\s*=\s*\{", re.MULTILINE)
     match = start_pattern.search(content)
 
     if not match:
-        raise ValueError(f"Could not find start of assignment for '{config_variable_name} = {{' in {ts_path}")
-
+        raise ValueError(f"Could not find an exported config object assignment like 'export const name = {{' in {ts_path}")
+    
+    # Extract the inferred variable name (mainly for potential error messages)
+    inferred_config_name = match.group(1)
     start_index = match.end() -1 # Index of the starting '{'
 
     # Find the matching closing '}' - basic brace counting
@@ -62,7 +65,7 @@ def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AI
                 break
     
     if end_index == -1:
-        raise ValueError(f"Could not find matching closing brace '}}' for '{config_variable_name}' in {ts_path}")
+        raise ValueError(f"Could not find matching closing brace '}}' for config object starting near '{inferred_config_name}' in {ts_path}")
 
     # Extract the object literal content
     object_literal = content[start_index : end_index + 1]
@@ -77,7 +80,7 @@ def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AI
     except json.JSONDecodeError as e:
         raise ValueError(
             f"Failed to parse the extracted content from {ts_path} as JSON. "
-            f"Ensure the object literal for '{config_variable_name}' uses JSON-compatible syntax. "
+            f"Ensure the object literal for the config export uses JSON-compatible syntax. "
             f"Error: {e}\nExtracted content snippet:\n{cleaned_literal[:500]}..."
         ) from e
 
@@ -86,4 +89,4 @@ def load_preset(ts_file_path: Union[str, Path], config_variable_name: str) -> AI
         return AIEnrichmentBlockConfig.model_validate(config_dict)
     except Exception as e:
         # Catch Pydantic validation errors or other issues
-        raise ValueError(f"Validation failed for config loaded from {ts_path} for variable '{config_variable_name}': {e}") from e
+        raise ValueError(f"Validation failed for config loaded from {ts_path}: {e}") from e

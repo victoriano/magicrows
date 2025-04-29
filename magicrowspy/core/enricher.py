@@ -2,6 +2,7 @@
 
 import logging
 from typing import List, Union, Dict, Any, Optional
+from pathlib import Path # Add Path import
 from jinja2 import Environment, Template
 import jsonschema # For validation after getting result
 import json # For parsing JSON string from OpenAI
@@ -16,6 +17,7 @@ from magicrowspy.config import (
     BaseProviderConfig,
     OpenAIProviderConfig, # Example
     OutputFormat,
+    load_preset # Import load_preset
 )
 from magicrowspy.config.models import (
     RunMode,
@@ -83,13 +85,14 @@ class Enricher:
     async def enrich(
         self,
         input_df: DataFrameType,
-        enrichment_config: AIEnrichmentBlockConfig
+        config_source: Union[str, Path, AIEnrichmentBlockConfig]
     ) -> DataFrameType:
         """Enriches the input dataframe based on the provided configuration.
 
         Args:
             input_df: The pandas or polars DataFrame to enrich.
-            enrichment_config: The configuration block detailing the enrichment tasks.
+            config_source: Either the path (str or Path) to a .ts preset file 
+                           or a pre-validated AIEnrichmentBlockConfig object.
 
         Returns:
             A new DataFrame (same type as input) with enriched data.
@@ -97,12 +100,27 @@ class Enricher:
         Raises:
             ValueError: If configuration is invalid or required columns are missing.
             RuntimeError: If AI provider calls fail after retries.
-            TypeError: If the input is not a supported DataFrame type.
+            TypeError: If the input is not a supported DataFrame type or config_source is invalid.
+            FileNotFoundError: If config_source is a path and the file is not found.
         """
-        logger.info(f"Starting enrichment process with mode: {enrichment_config.mode}")
+        # 1. Load and validate config if path is provided
+        if isinstance(config_source, (str, Path)):
+            logger.info(f"Loading enrichment config from path: {config_source}")
+            try:
+                config = load_preset(config_source)
+            except Exception as e:
+                logger.error(f"Failed to load or validate preset from {config_source}: {e}")
+                raise # Re-raise the exception from load_preset
+        elif isinstance(config_source, AIEnrichmentBlockConfig):
+            logger.info("Using pre-validated enrichment config object.")
+            config = config_source
+        else:
+            raise TypeError("config_source must be a file path (str/Path) or an AIEnrichmentBlockConfig object.")
 
-        # 1. Validate input and config
-        provider_name = enrichment_config.integrationName
+        logger.info(f"Starting enrichment process with mode: {config.mode}")
+
+        # 2. Validate provider
+        provider_name = config.integrationName
         if provider_name not in self.providers:
             raise ValueError(
                 f"Provider '{provider_name}' specified in enrichment config "
@@ -111,7 +129,7 @@ class Enricher:
         provider_conf = self.providers[provider_name]
         # TODO: Add more validation (e.g., check context columns exist in df)
 
-        # 2. Determine DataFrame type and select appropriate processing strategy
+        # 3. Determine DataFrame type and select appropriate processing strategy
         is_pandas = pd is not None and isinstance(input_df, pd.DataFrame)
         is_polars = pl is not None and isinstance(input_df, pl.DataFrame)
 
@@ -120,10 +138,12 @@ class Enricher:
 
         if is_pandas:
             logger.debug("Processing with pandas backend.")
-            return await self._enrich_pandas(input_df, enrichment_config, provider_conf)
+            # Pass the loaded/validated config object
+            return await self._enrich_pandas(input_df, config, provider_conf)
         elif is_polars:
             logger.debug("Processing with polars backend.")
-            return await self._enrich_polars(input_df, enrichment_config, provider_conf)
+            # Pass the loaded/validated config object
+            return await self._enrich_polars(input_df, config, provider_conf)
         else:
             # Should be unreachable due to the earlier check
             raise TypeError("Unsupported DataFrame type.") 

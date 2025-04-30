@@ -17,7 +17,7 @@ from magicrowspy.config import OpenAIProviderConfig
 # --- Configuration --- 
 # Relative paths to presets from this script's location
 PRESET_FILE_PATH_TASKS = "../presets/ISCOTasks_preset.ts"
-PRESET_FILE_PATH_NOVELTY = "../presets/ISCONovelty_preset.ts"
+# PRESET_FILE_PATH_NOVELTY = "../presets/ISCONovelty_preset.ts"
 
 # Path to input CSV (adjust as needed)
 CSV_INPUT_PATH_STR = "/Users/victoriano/Desktop/MagicRows Data/Tasks EU15.csv"
@@ -49,13 +49,13 @@ async def main():
     # --- Run Enrichment --- 
     print("Starting enrichment for Tasks...")
     # Pass the preset file path directly
-    output_df_tasks = await enricher.enrich(input_df.copy(), PRESET_FILE_PATH_TASKS)
+    output_df_tasks = await enricher.enrich(input_df.iloc[10:12], PRESET_FILE_PATH_TASKS, reasoning=False)
     print("Enrichment completed for Tasks.")
 
-    print("Starting enrichment for Novelty...")
-    # Pass the preset file path directly
-    output_df_novelty = await enricher.enrich(input_df.copy(), PRESET_FILE_PATH_NOVELTY)
-    print("Enrichment completed for Novelty.")
+    # print("Starting enrichment for Novelty...")
+    # # Pass the preset file path directly
+    # # output_df_novelty = await enricher.enrich(input_df.copy(), PRESET_FILE_PATH_NOVELTY)
+    # print("Enrichment completed for Novelty.")
 
     # --- Export Results --- 
     desktop_path = Path.home() / "Desktop"
@@ -68,11 +68,11 @@ async def main():
     output_df_tasks.to_csv(output_path_tasks, index=False)
     print(f"Successfully wrote Tasks output CSV: {output_path_tasks}")
 
-    # Export Novelty
-    output_filename_novelty = f"{csv_input_path.stem}_enriched_novelty_{timestamp}{csv_input_path.suffix}"
-    output_path_novelty = desktop_path / output_filename_novelty
-    output_df_novelty.to_csv(output_path_novelty, index=False)
-    print(f"Successfully wrote Novelty output CSV: {output_path_novelty}")
+    # # Export Novelty
+    # # output_filename_novelty = f"{csv_input_path.stem}_enriched_novelty_{timestamp}{csv_input_path.suffix}"
+    # # output_path_novelty = desktop_path / output_filename_novelty
+    # # output_df_novelty.to_csv(output_path_novelty, index=False)
+    # # print(f"Successfully wrote Novelty output CSV: {output_path_novelty}")
 
 # --- Run --- 
 if __name__ == "__main__":

@@ -5,11 +5,12 @@ from typing import Dict, Any, List
 from magicrowspy.config.models import OutputConfig, OutputType, OutputCardinality, OutputCategory
 
 
-def generate_json_schema(output_config: OutputConfig) -> Dict[str, Any]:
+def generate_json_schema(output_config: OutputConfig, reasoning: bool) -> Dict[str, Any]:
     """Translates an OutputConfig object into a JSON Schema dictionary.
 
     Args:
         output_config: The configuration for a single output.
+        reasoning: If True, include the reasoning field in the schema.
 
     Returns:
         A dictionary representing the JSON Schema for the expected output.
@@ -72,41 +73,52 @@ def generate_json_schema(output_config: OutputConfig) -> Dict[str, Any]:
     else: # SINGLE cardinality
         properties[output_config.name] = prop_schema
 
-    # Conditionally add reasoning
-    if output_config.includeReasoning:
-        # The 'schema' dict currently holds the schema for the output value itself
-        # (e.g., {"type": "string", "enum": [...]})
-        # We need to wrap this into a new structure like:
-        # {
-        #   "type": "object", 
-        #   "properties": {"value": <original_schema>, "reasoning": {...}}, 
-        #   "required": ["value", "reasoning"],
-        #   "additionalProperties": false
+    # Conditionally add reasoning structure to the schema
+    if output_config.includeReasoning and reasoning:
+        # The 'properties' dict currently holds the schema for the output value itself
+        # e.g., properties = { output_config.name: {"type": "string", "enum": [...]}}
+        # We need to wrap this value schema and add a reasoning schema:
+        # final_schema = {
+        #   "type": "object",
+        #   "properties": {
+        #       output_config.name: {
+        #           "type": "object",
+        #           "properties": {
+        #               "value": <original_value_schema>,
+        #               "reasoning": <reasoning_schema>
+        #           },
+        #           "required": ["value", "reasoning"],
+        #           "additionalProperties": False
+        #       }
+        #   },
+        #   "required": [output_config.name]
         # }
-        
+
+        # Extract the original schema for the value
+        original_value_schema = properties[output_config.name]
+
         # Create the schema for the 'reasoning' property
-        reasoning_prop = {
+        reasoning_prop_schema = {
             "type": "string",
             "description": "Explanation for why the value was chosen or generated."
         }
 
-        # Create the schema for the 'value' property, using the existing schema
-        value_prop = schema # The original schema IS the schema for the value
-
-        # Build the new top-level schema
-        new_schema = {
-            "title": f"{output_config.name}_with_reasoning", # More descriptive title
-            "description": f"Generated output for {output_config.name} including reasoning.",
+        # Build the new wrapped schema for the output property
+        wrapped_prop_schema = {
             "type": "object",
+            "description": f"Output value and reasoning for {output_config.name}",
             "properties": {
-                "value": value_prop, # Embed the original schema here
-                "reasoning": reasoning_prop
+                "value": original_value_schema,
+                "reasoning": reasoning_prop_schema
             },
-            "required": ["value", "reasoning"], # Make both required
-            "additionalProperties": False # Ensure strictness at this new top level
+            "required": ["value", "reasoning"],
+            "additionalProperties": False
         }
-        schema = new_schema # Replace original schema with the wrapped version
 
+        # Replace the original property schema with the new wrapped one
+        properties[output_config.name] = wrapped_prop_schema
+
+    # Final schema structure remains the same, but the property schema inside might be wrapped
     return schema
 
 def generate_combined_json_schema(outputs: List[OutputConfig]) -> Dict[str, Any]:

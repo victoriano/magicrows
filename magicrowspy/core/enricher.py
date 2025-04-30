@@ -85,7 +85,8 @@ class Enricher:
     async def enrich(
         self,
         input_df: DataFrameType,
-        config_source: Union[str, Path, AIEnrichmentBlockConfig]
+        config_source: Union[str, Path, AIEnrichmentBlockConfig],
+        reasoning: bool = True
     ) -> DataFrameType:
         """Enriches the input dataframe based on the provided configuration.
 
@@ -93,6 +94,7 @@ class Enricher:
             input_df: The pandas or polars DataFrame to enrich.
             config_source: Either the path (str or Path) to a .ts preset file 
                            or a pre-validated AIEnrichmentBlockConfig object.
+            reasoning: If True, include columns with AI reasoning (default: True).
 
         Returns:
             A new DataFrame (same type as input) with enriched data.
@@ -139,11 +141,11 @@ class Enricher:
         if is_pandas:
             logger.debug("Processing with pandas backend.")
             # Pass the loaded/validated config object
-            return await self._enrich_pandas(input_df, config, provider_conf)
+            return await self._enrich_pandas(input_df, config, provider_conf, reasoning)
         elif is_polars:
             logger.debug("Processing with polars backend.")
             # Pass the loaded/validated config object
-            return await self._enrich_polars(input_df, config, provider_conf)
+            return await self._enrich_polars(input_df, config, provider_conf, reasoning)
         else:
             # Should be unreachable due to the earlier check
             raise TypeError("Unsupported DataFrame type.") 
@@ -152,7 +154,8 @@ class Enricher:
         self,
         df: PandasDataFrame,
         config: AIEnrichmentBlockConfig,
-        provider_conf: BaseProviderConfig
+        provider_conf: BaseProviderConfig,
+        reasoning: bool
     ):
         logger.info(f"--- Entering _enrich_pandas --- Mode: {config.mode}, Format: {config.outputFormat} (Type: {type(config.outputFormat)}) ---")
         
@@ -206,7 +209,7 @@ class Enricher:
                 row_result[field] = pd.NA
                 
                 # Add the reasoning field if required
-                if includes_reasoning:
+                if includes_reasoning and reasoning:
                     field_reasoning = f"{field}_reasoning"
                     row_result[field_reasoning] = pd.NA
             
@@ -219,8 +222,8 @@ class Enricher:
                 template = output_config.prompt
                 rendered_prompt = self._render_prompt(template, row)
                 
-                # Generate the schema
-                schema = generate_json_schema(output_config)
+                # Generate the schema, passing the reasoning flag
+                schema = generate_json_schema(output_config, reasoning)
                 
                 # Get provider config from parent config or use default
                 model = getattr(config, "model", "gpt-4")
@@ -244,35 +247,32 @@ class Enricher:
                     if result and field in result:
                         provider_data = result[field] # This is either the value or {"value": ..., "reasoning": ...}
                         
-                        if includes_reasoning:
+                        if includes_reasoning and reasoning:
                             if isinstance(provider_data, dict) and "value" in provider_data:
-                                # Extract nested value and reasoning
-                                nested_value_dict = provider_data.get("value", {})
-                                # The actual value is inside the nested dict, keyed by the field name
-                                row_result[field] = nested_value_dict.get(field, pd.NA) 
+                                # Correctly extract the value (can be single item or list)
+                                row_result[field] = provider_data.get("value", pd.NA) 
                                 row_result[f"{field}_reasoning"] = provider_data.get("reasoning", pd.NA)
-                                logger.debug(f"Stored value (w/ reasoning): '{row_result[field]}', Reasoning: '{row_result[f'{field}_reasoning']}'")
                             else:
-                                # Reasoning expected but not found in correct structure
-                                logger.warning(f"Reasoning enabled for {field}, but result structure unexpected: {provider_data}. Storing raw data.")
-                                row_result[field] = provider_data # Store whatever was returned as value
-                                row_result[f"{field}_reasoning"] = pd.NA # Set reasoning to NA
-                        else:
-                            # Reasoning not enabled, store the direct value
-                            row_result[field] = provider_data
-                            logger.debug(f"Stored value (no reasoning): '{row_result[field]}'")
+                                # Handle cases where reasoning was expected but not returned correctly
+                                logger.warning(f"Reasoning requested but provider did not return expected structure for {field}. Setting to NA.")
+                                row_result[field] = pd.NA # Fallback
+                                row_result[f"{field}_reasoning"] = pd.NA # Fallback
+                        else: # Reasoning not requested or not included in preset
+                            # Value should be directly under the field name in the result
+                            row_result[field] = provider_data # Assign the direct value
+
                     else:
                         # Handle cases where provider call failed or returned unexpected structure
                         logger.warning(f"No valid result from provider for {field}. Setting to NA.")
                         row_result[field] = pd.NA
-                        if includes_reasoning:
+                        if includes_reasoning and reasoning:
                             row_result[f"{field}_reasoning"] = pd.NA
                 
                 except Exception as e:
                     logger.error(f"Error processing row {index} for output {field}: {e}")
                     # Ensure fallback NA values remain if error occurs
                     row_result[field] = pd.NA
-                    if includes_reasoning:
+                    if includes_reasoning and reasoning:
                         row_result[f"{field}_reasoning"] = pd.NA
             
             # Only add the row_result to results_dict_list after all outputs have been processed
@@ -303,7 +303,8 @@ class Enricher:
         self,
         df: 'pl.DataFrame',
         config: AIEnrichmentBlockConfig,
-        provider_conf: BaseProviderConfig
+        provider_conf: BaseProviderConfig,
+        reasoning: bool
     ) -> 'pl.DataFrame':
         """Enrichment logic for Polars DataFrames, including reasoning."""
         provider_conf = next((p for p in self.providers if p.integrationName == config.integrationName), None)
@@ -361,7 +362,8 @@ class Enricher:
 
                 # 3. Generate Schema
                 try:
-                    output_schema = generate_json_schema(output_conf)
+                    # Pass the reasoning flag here as well
+                    output_schema = generate_json_schema(output_conf, reasoning)
                 except ValueError as e:
                     logger.error(f"Failed to generate schema for output '{output_conf.name}': {e}")
                     row_results[output_conf.name] = None
@@ -399,7 +401,7 @@ class Enricher:
              output_columns = config.contextColumns if config.contextColumns else []
              for o in config.outputs:
                  output_columns.append(o.name)
-                 if o.includeReasoning:
+                 if o.includeReasoning and reasoning:
                      output_columns.append(f"{o.name}_reasoning")
 
              if config.outputFormat == OutputFormat.NEW_COLUMNS:
@@ -426,20 +428,20 @@ class Enricher:
                 output_name = output_conf.name
                 reasoning_name = f"{output_name}_reasoning"
                 all_output_column_names.append(output_name)
-                if output_conf.includeReasoning:
+                if output_conf.includeReasoning and reasoning:
                     all_output_column_names.append(reasoning_name)
                 
                 # Extract values and reasoning for this output across all rows
                 values = []
-                reasonings = [] if output_conf.includeReasoning else None
+                reasonings = [] if output_conf.includeReasoning and reasoning else None
                 
                 for row_result in all_row_results:
-                    result_data = row_result.get(output_name) if row_result else None
+                    result_data = row_result.get(output_name) # Now gets {'value': ..., 'reasoning': ...}
                     final_value = None
                     final_reasoning = None
 
                     # Check if reasoning was included for this output
-                    if output_conf.includeReasoning:
+                    if output_conf.includeReasoning and reasoning:
                         if isinstance(result_data, dict) and "value" in result_data:
                             # Extract nested value and reasoning
                             nested_value_dict = result_data.get("value", {})
@@ -458,20 +460,20 @@ class Enricher:
                     # else: result_data is None, final_value/reasoning remain None
                     
                     values.append(final_value)
-                    if output_conf.includeReasoning:
+                    if output_conf.includeReasoning and reasoning:
                         reasonings.append(final_reasoning)
 
                 # Handle preview mode: Pad with nulls if necessary
                 if config.mode == RunMode.PREVIEW and len(values) < len(df):
                     num_missing = len(df) - len(values)
                     values.extend([None] * num_missing)
-                    if output_conf.includeReasoning:
+                    if output_conf.includeReasoning and reasoning:
                         reasonings.extend([None] * num_missing)
                 
                 # Create Polars Series and add expression
                 # TODO: Infer schema or handle types more robustly? Polars might handle Series auto-detection.
                 new_column_expressions.append(pl.Series(output_name, values).alias(output_name))
-                if output_conf.includeReasoning:
+                if output_conf.includeReasoning and reasoning:
                     new_column_expressions.append(pl.Series(reasoning_name, reasonings).alias(reasoning_name))
 
             # Add all new columns at once
@@ -488,7 +490,7 @@ class Enricher:
             all_output_column_names = []
             for o in config.outputs:
                 all_output_column_names.append(o.name)
-                if o.includeReasoning:
+                if o.includeReasoning and reasoning:
                     all_output_column_names.append(f"{o.name}_reasoning")
 
             for i, row_result in enumerate(all_row_results):
@@ -513,7 +515,7 @@ class Enricher:
                         value_list = None
                         reasoning_for_all = None
                         # Check if reasoning is included to determine structure
-                        if output_conf.includeReasoning:
+                        if output_conf.includeReasoning and reasoning:
                             # Expects {'value': [...], 'reasoning': '...'} 
                             if isinstance(result_dict, dict) and isinstance(result_dict.get("value"), list):
                                 value_list = result_dict["value"] if result_dict["value"] else [None]
@@ -570,7 +572,7 @@ class Enricher:
                     for name, result_item in zip(output_names_in_product_order, combo):
                         output_conf = output_config_map[name]
                         new_row[name] = result_item['value'] if result_item['value'] is not None else pd.NA
-                        if output_conf.includeReasoning:
+                        if output_conf.includeReasoning and reasoning:
                             new_row[f"{name}_reasoning"] = result_item['reasoning'] if result_item['reasoning'] is not None else pd.NA
                     new_rows_list.append(new_row)
 

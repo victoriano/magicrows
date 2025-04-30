@@ -5,15 +5,9 @@ import datetime
 from pathlib import Path
 import pandas as pd
 
-
 from magicrowspy import Enricher # load_preset is no longer needed here
 from magicrowspy.config import OpenAIProviderConfig
 
-
-# --- Constants ---
-# Preset names (assuming they are bundled with the package)
-PRESET_NAME_TASKS = "ISCO/ISCOTasks_preset.ts"
-# PRESET_NAME_NOVELTY = "ISCO/ISCONovelty_preset.ts"
 
 # Path to input CSV (adjust as needed)
 CSV_INPUT_PATH_STR = "/Users/victoriano/Desktop/MagicRows Data/Tasks EU15.csv"
@@ -42,10 +36,9 @@ async def main():
 
     # --- Run Enrichment --- 
     print("Starting enrichment for Tasks...")
-    # Pass the preset name string directly
     output_df_tasks = await enricher.enrich(
         input_df.iloc[10:12], 
-        PRESET_NAME_TASKS, # Use the simple name
+        "ISCO/ISCOTasks_preset.ts", 
         reasoning=False, 
         log_requests=True
     )

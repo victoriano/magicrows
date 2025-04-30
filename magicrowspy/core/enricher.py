@@ -125,7 +125,8 @@ class Enricher:
         input_df: DataFrameType,
         config_source: Union[str, Path, AIEnrichmentBlockConfig],
         log_requests: bool = False,
-        log_summary: bool = False 
+        log_summary: bool = False,
+        reasoning_override: Optional[bool] = None
     ) -> DataFrameType:
         """Enriches the input dataframe based on the provided configuration, with options for logging requests and a final summary."""
         start_total_time = time.perf_counter()
@@ -185,7 +186,8 @@ class Enricher:
                     batch_df,
                     config,
                     log_requests,
-                    gather_func # Pass the gather function
+                    gather_func, # Pass the gather function
+                    reasoning_override
                 )
                 results_list.extend(batch_results)
                 total_api_duration_across_batches += batch_api_duration
@@ -314,11 +316,63 @@ class Enricher:
 
         return parsed_content, usage_stats, api_duration
 
+    async def _process_batch(
+        self,
+        batch_df: DataFrameType,
+        config: AIEnrichmentBlockConfig,
+        log_requests: bool,
+        gather_func: callable,
+        reasoning_override: Optional[bool] = None
+    ) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, int]], float]:
+        """Processes a batch of rows concurrently and aggregates results, usage, and duration."""
+        tasks = []
+        if PANDAS_AVAILABLE and isinstance(batch_df, pd.DataFrame):
+            row_items = list(batch_df.iterrows())
+        elif POLARS_AVAILABLE and isinstance(batch_df, pl.DataFrame):
+             rows_as_dicts = batch_df.to_dicts()
+             row_items = list(enumerate(rows_as_dicts)) 
+        else:
+             logger.error("Unsupported DataFrame type in _process_batch")
+             return [], {'successful_calls': 0}, 0.0
+
+        for row_tuple in row_items:
+            tasks.append(
+                self._process_row_item(
+                    row_tuple=row_tuple,
+                    config=config,
+                    log_requests=log_requests,
+                    reasoning_override=reasoning_override
+                )
+            )
+        
+        # Run tasks concurrently with the provided gather function
+        results_tuples = await gather_func(*tasks, desc="Processing Rows in Batch", leave=False)
+        
+        # Aggregate results, usage, and duration from the batch
+        batch_results_list = []
+        aggregated_batch_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'successful_calls': 0}
+        total_batch_api_duration = 0.0
+        
+        for result_data, usage_stats, api_duration in results_tuples:
+            if result_data:
+                result_data.pop('<row_index>', None)
+                batch_results_list.append(result_data)
+                
+            if usage_stats:
+                aggregated_batch_usage['prompt_tokens'] += usage_stats.get('prompt_tokens', 0)
+                aggregated_batch_usage['completion_tokens'] += usage_stats.get('completion_tokens', 0)
+                aggregated_batch_usage['total_tokens'] += usage_stats.get('total_tokens', 0)
+                aggregated_batch_usage['successful_calls'] += usage_stats.get('successful_calls', 0)
+            total_batch_api_duration += api_duration
+            
+        return batch_results_list, aggregated_batch_usage, total_batch_api_duration
+
     async def _process_row_item(
         self,
         row_tuple: Tuple[int, Any], 
         config: AIEnrichmentBlockConfig,
         log_requests: bool,
+        reasoning_override: Optional[bool] = None
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, int]], float]:
         row_index, row_data = row_tuple
         row_data['<row_index>'] = row_index 
@@ -347,7 +401,7 @@ class Enricher:
         for output_config in config.outputs:
             prompt_builder = PromptBuilder(output_config, config.contextColumns)
             try:
-                prompt = prompt_builder.build_prompt(row_data) 
+                prompt = prompt_builder.build_prompt(row_data, reasoning_override=reasoning_override) 
             except Exception as e:
                 logger.error(f"Failed to build prompt for row {row_index}, output '{output_config.name}': {e}", exc_info=True)
                 if config.outputFormat == OutputFormat.NEW_COLUMNS:
@@ -398,51 +452,48 @@ class Enricher:
              
         return final_row_output, aggregated_row_usage, total_row_api_duration
 
-    async def _process_batch(
-        self,
-        batch_df: DataFrameType,
-        config: AIEnrichmentBlockConfig,
-        log_requests: bool,
-        gather_func: callable # Accept the gather function as argument
-    ) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, int]], float]:
-        """Processes a batch of rows concurrently and aggregates results, usage, and duration."""
-        tasks = []
-        if PANDAS_AVAILABLE and isinstance(batch_df, pd.DataFrame):
-            row_items = list(batch_df.iterrows())
-        elif POLARS_AVAILABLE and isinstance(batch_df, pl.DataFrame):
-             rows_as_dicts = batch_df.to_dicts()
-             row_items = list(enumerate(rows_as_dicts)) 
-        else:
-             logger.error("Unsupported DataFrame type in _process_batch")
-             return [], {'successful_calls': 0}, 0.0
-
-        for row_tuple in row_items:
-            tasks.append(
-                self._process_row_item(
-                    row_tuple=row_tuple,
-                    config=config,
-                    log_requests=log_requests,
-                )
-            )
+    def _log_enrichment_summary(
+        self, 
+        total_processed_rows: int,
+        total_batches: int,
+        successful_api_calls_counter: int,
+        total_input_tokens_counter: int,
+        total_output_tokens_counter: int,
+        total_api_time_counter: float,
+        total_time_elapsed: float
+    ):
+        """Log a summary of the enrichment process."""
+        # Calculate totals and averages
+        total_tokens = total_input_tokens_counter + total_output_tokens_counter
         
-        # Run tasks concurrently with the provided gather function
-        results_tuples = await gather_func(*tasks, desc="Processing Rows in Batch", leave=False)
+        # Estimate costs (customize based on your provider's pricing)
+        # These are approximate costs for GPT-4
+        cost_per_input_1k = 0.005  # $0.005 per 1K input tokens (GPT-4 approx)
+        cost_per_output_1k = 0.015  # $0.015 per 1K output tokens (GPT-4 approx)
         
-        # Aggregate results, usage, and duration from the batch
-        batch_results_list = []
-        aggregated_batch_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'successful_calls': 0}
-        total_batch_api_duration = 0.0
+        estimated_input_cost = (total_input_tokens_counter / 1000) * cost_per_input_1k
+        estimated_output_cost = (total_output_tokens_counter / 1000) * cost_per_output_1k
+        estimated_total_cost = estimated_input_cost + estimated_output_cost
         
-        for result_data, usage_stats, api_duration in results_tuples:
-            if result_data:
-                result_data.pop('<row_index>', None)
-                batch_results_list.append(result_data)
-                
-            if usage_stats:
-                aggregated_batch_usage['prompt_tokens'] += usage_stats.get('prompt_tokens', 0)
-                aggregated_batch_usage['completion_tokens'] += usage_stats.get('completion_tokens', 0)
-                aggregated_batch_usage['total_tokens'] += usage_stats.get('total_tokens', 0)
-                aggregated_batch_usage['successful_calls'] += usage_stats.get('successful_calls', 0)
-            total_batch_api_duration += api_duration
-            
-        return batch_results_list, aggregated_batch_usage, total_batch_api_duration
+        # Print summary
+        print("\n========== Enrichment Summary ==========")
+        print(f"Total Rows Processed: {total_processed_rows}")
+        print(f"Total Batches:        {total_batches}")
+        print(f"Successful API Calls: {successful_api_calls_counter}")
+        print("------------------------------------")
+        print(f"Total Time Elapsed:   {total_time_elapsed:.4f} s")
+        print(f"Sum of API Call Durations: {total_api_time_counter:.4f} s")
+        # We're removing the "Total Processing Time" line since it can be negative and confusing
+        avg_api_time = total_api_time_counter / successful_api_calls_counter if successful_api_calls_counter else 0
+        print(f"Avg. API Time/Call:   {avg_api_time:.4f} s")
+        avg_total_time_row = total_time_elapsed / total_processed_rows if total_processed_rows else 0
+        print(f"Avg. Total Time/Row:  {avg_total_time_row:.4f} s")
+        print("------------------------------------")
+        print(f"Input Tokens:         {total_input_tokens_counter}")
+        print(f"Output Tokens:        {total_output_tokens_counter}")
+        print(f"Total Tokens:         {total_tokens}")
+        print("------------------------------------")
+        print(f"Estimated Input Cost: ${estimated_input_cost:.6f} (@ ${cost_per_input_1k*1000:.1f}/M)")
+        print(f"Estimated Output Cost:${estimated_output_cost:.6f} (@ ${cost_per_output_1k*1000:.1f}/M)")
+        print(f"Estimated Total Cost: ${estimated_total_cost:.6f}")
+        print("======================================")

@@ -39,6 +39,7 @@ async def main():
     output_df_tasks = await enricher.enrich(
         input_df.iloc[10:12], 
         "ISCO/ISCOTasks_preset.ts", 
+        reasoning_override=True,  
         log_requests=True,
         log_summary=True # Added to enable the summary log
     )

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from jinja2 import Environment, Template, TemplateError, UndefinedError
 
@@ -32,13 +32,14 @@ class PromptBuilder:
             self.template_error = e 
             self.template = None # Ensure template is None if compilation failed
 
-    def build_prompt(self, row_data: Dict[str, Any]) -> str:
+    def build_prompt(self, row_data: Dict[str, Any], reasoning_override: Optional[bool] = None) -> str:
         """
         Builds the final prompt string for a given row.
 
         Args:
             row_data: A dictionary representing the data for a single row.
-
+            reasoning_override: If provided, overrides the includeReasoning setting from the output_config
+            
         Returns:
             The formatted prompt string.
             
@@ -66,8 +67,9 @@ class PromptBuilder:
         # Add output type for context
         context['output_type'] = self.output_config.outputType.value
             
-        # Include reasoning flag if needed
-        context['include_reasoning'] = self.output_config.includeReasoning
+        # Include reasoning flag if needed, prioritizing the override if provided
+        include_reasoning = reasoning_override if reasoning_override is not None else self.output_config.includeReasoning
+        context['include_reasoning'] = include_reasoning
 
         # Render the template
         try:

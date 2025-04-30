@@ -1,5 +1,3 @@
-"""Simplified script to test the magicrowspy enricher functionality (no error handling)."""
-
 import os
 import sys
 import asyncio
@@ -7,17 +5,15 @@ import datetime
 from pathlib import Path
 import pandas as pd
 
-# Adjust the path if necessary if the script is run from outside the examples folder
-# Or ensure the package is installed correctly
+
 from magicrowspy import Enricher # load_preset is no longer needed here
 from magicrowspy.config import OpenAIProviderConfig
-# AIEnrichmentBlockConfig no longer needed here directly
-# from magicrowspy.config.models import AIEnrichmentBlockConfig 
 
-# --- Configuration --- 
-# Relative paths to presets from this script's location
-PRESET_FILE_PATH_TASKS = "../presets/ISCOTasks_preset.ts"
-# PRESET_FILE_PATH_NOVELTY = "../presets/ISCONovelty_preset.ts"
+
+# --- Constants ---
+# Preset names (assuming they are bundled with the package)
+PRESET_NAME_TASKS = "ISCO/ISCOTasks_preset.ts"
+# PRESET_NAME_NOVELTY = "ISCO/ISCONovelty_preset.ts"
 
 # Path to input CSV (adjust as needed)
 CSV_INPUT_PATH_STR = "/Users/victoriano/Desktop/MagicRows Data/Tasks EU15.csv"
@@ -31,30 +27,33 @@ if not api_key:
 
 # --- Main Async Function --- 
 async def main():
-    # Presets are loaded inside enricher.enrich now
 
     # --- Load Input Data --- 
     csv_input_path = Path(CSV_INPUT_PATH_STR)
-    # Assume file exists and is readable
     input_df = pd.read_csv(csv_input_path)
     print(f"Successfully read input CSV: {csv_input_path}")
 
     # --- Configure Provider & Enricher --- 
     openai_provider = OpenAIProviderConfig(
-        integrationName="myOpenAI", # Matches integrationName in presets
+        integrationName="myOpenAI", 
         apiKey=api_key,
     )
     enricher = Enricher(providers=[openai_provider])
 
     # --- Run Enrichment --- 
     print("Starting enrichment for Tasks...")
-    # Pass the preset file path directly
-    output_df_tasks = await enricher.enrich(input_df.iloc[10:12], PRESET_FILE_PATH_TASKS, reasoning=False)
+    # Pass the preset name string directly
+    output_df_tasks = await enricher.enrich(
+        input_df.iloc[10:12], 
+        PRESET_NAME_TASKS, # Use the simple name
+        reasoning=False, 
+        log_requests=True
+    )
     print("Enrichment completed for Tasks.")
 
     # print("Starting enrichment for Novelty...")
-    # # Pass the preset file path directly
-    # # output_df_novelty = await enricher.enrich(input_df.copy(), PRESET_FILE_PATH_NOVELTY)
+    # # Pass the preset name string directly
+    # output_df_novelty = await enricher.enrich(input_df.copy(), PRESET_NAME_NOVELTY)
     # print("Enrichment completed for Novelty.")
 
     # --- Export Results --- 
@@ -69,10 +68,10 @@ async def main():
     print(f"Successfully wrote Tasks output CSV: {output_path_tasks}")
 
     # # Export Novelty
-    # # output_filename_novelty = f"{csv_input_path.stem}_enriched_novelty_{timestamp}{csv_input_path.suffix}"
-    # # output_path_novelty = desktop_path / output_filename_novelty
-    # # output_df_novelty.to_csv(output_path_novelty, index=False)
-    # # print(f"Successfully wrote Novelty output CSV: {output_path_novelty}")
+    # output_filename_novelty = f"{csv_input_path.stem}_enriched_novelty_{timestamp}{csv_input_path.suffix}"
+    # output_path_novelty = desktop_path / output_filename_novelty
+    # output_df_novelty.to_csv(output_path_novelty, index=False)
+    # print(f"Successfully wrote Novelty output CSV: {output_path_novelty}")
 
 # --- Run --- 
 if __name__ == "__main__":

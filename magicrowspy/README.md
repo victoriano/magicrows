@@ -55,6 +55,49 @@ uv pip install -e .
         *   `includeReasoning`: `true` or `false`.
         *   `outputCategories` (if `outputType` is `CATEGORY`).
 
+## Usage
+
+Basic workflow involves:
+1.  Setting up your provider configurations (e.g., OpenAI API key).
+2.  Loading your input data (e.g., from a CSV) into a pandas DataFrame.
+3.  Initializing the `Enricher` with your provider configurations.
+4.  Calling the `enricher.enrich()` method, passing your DataFrame and the desired preset configuration.
+5.  Processing or saving the resulting enriched DataFrame.
+
+### Loading Preset Configurations
+
+The `enricher.enrich(config_source=...)` method accepts the preset configuration in several ways:
+
+*   **Bundled Preset (Recommended):** Specify the preset name as a string relative to the library's internal `presets` directory. This is the simplest way to use the standard presets provided with `magicrowspy`.
+    ```python
+    # Assumes 'ISCO/ISCOTasks_preset.ts' exists within magicrowspy's installed presets
+    output_df = await enricher.enrich(input_df, "ISCO/ISCOTasks_preset.ts")
+    ```
+
+*   **External Preset (Absolute Path):** Provide the full, absolute path to your custom `.ts` preset file as a string.
+    ```python
+    output_df = await enricher.enrich(input_df, "/Users/you/my_magicrows_configs/custom_analysis.ts")
+    ```
+
+*   **External Preset (Relative Path):** Provide a path relative to the *current working directory* where you run your Python script.
+    ```python
+    # Assumes 'my_presets/custom_analysis.ts' exists relative to where you run python
+    output_df = await enricher.enrich(input_df, "my_presets/custom_analysis.ts")
+    ```
+
+*   **External Preset (Path Object):** Use a `pathlib.Path` object for more robust path handling.
+    ```python
+    from pathlib import Path
+    preset_path = Path("../configs/shared_preset.ts").resolve()
+    output_df = await enricher.enrich(input_df, preset_path)
+    ```
+
+*   **Pre-loaded Config Object:** You can also manually load and validate a config object using `magicrowspy.config.load_preset` and pass the resulting `AIEnrichmentBlockConfig` object directly (though this is less common for typical usage).
+
+### Example Script
+
+See `magicrowspy/scripts_examples/simple_enrichment_script.py` for a runnable example.
+
 ## Core Usage
 
 ```python
@@ -118,8 +161,6 @@ if __name__ == "__main__":
     except NameError:
         # If not in Jupyter, run normally
         asyncio.run(main())
-
-```
 
 ## Notes
 

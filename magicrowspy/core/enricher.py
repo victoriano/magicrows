@@ -43,8 +43,8 @@ except ImportError:
 
 DataFrameType = Union[PandasDataFrame, PolarsDataFrame]
 
-# Setup basic logging *before* potential import errors that use it
-logger = logging.getLogger(__name__)
+# Use a logger specific to the library
+logger = logging.getLogger('magicrowspy')
 
 # Attempt to import OpenAI client and exceptions *before* class definition
 try:
@@ -86,7 +86,8 @@ class Enricher:
         self,
         input_df: DataFrameType,
         config_source: Union[str, Path, AIEnrichmentBlockConfig],
-        reasoning: bool = True
+        reasoning: bool = True,
+        log_requests: bool = False
     ) -> DataFrameType:
         """Enriches the input dataframe based on the provided configuration.
 
@@ -95,6 +96,7 @@ class Enricher:
             config_source: Either the path (str or Path) to a .ts preset file 
                            or a pre-validated AIEnrichmentBlockConfig object.
             reasoning: If True, include columns with AI reasoning (default: True).
+            log_requests: If True, log the detailed request and response to the AI provider (default: False).
 
         Returns:
             A new DataFrame (same type as input) with enriched data.
@@ -141,11 +143,11 @@ class Enricher:
         if is_pandas:
             logger.debug("Processing with pandas backend.")
             # Pass the loaded/validated config object
-            return await self._enrich_pandas(input_df, config, provider_conf, reasoning)
+            return await self._enrich_pandas(input_df, config, provider_conf, reasoning, log_requests)
         elif is_polars:
             logger.debug("Processing with polars backend.")
             # Pass the loaded/validated config object
-            return await self._enrich_polars(input_df, config, provider_conf, reasoning)
+            return await self._enrich_polars(input_df, config, provider_conf, reasoning, log_requests)
         else:
             # Should be unreachable due to the earlier check
             raise TypeError("Unsupported DataFrame type.") 
@@ -155,7 +157,8 @@ class Enricher:
         df: PandasDataFrame,
         config: AIEnrichmentBlockConfig,
         provider_conf: BaseProviderConfig,
-        reasoning: bool
+        reasoning: bool,
+        log_requests: bool
     ):
         logger.info(f"--- Entering _enrich_pandas --- Mode: {config.mode}, Format: {config.outputFormat} (Type: {type(config.outputFormat)}) ---")
         
@@ -237,7 +240,8 @@ class Enricher:
                         temperature=temperature,
                         output_name=field,
                         output_schema=schema,
-                        prompt=rendered_prompt
+                        prompt=rendered_prompt,
+                        log_requests=log_requests
                     )
                     
                     # Debug the result from the provider
@@ -304,7 +308,8 @@ class Enricher:
         df: 'pl.DataFrame',
         config: AIEnrichmentBlockConfig,
         provider_conf: BaseProviderConfig,
-        reasoning: bool
+        reasoning: bool,
+        log_requests: bool
     ) -> 'pl.DataFrame':
         """Enrichment logic for Polars DataFrames, including reasoning."""
         provider_conf = next((p for p in self.providers if p.integrationName == config.integrationName), None)
@@ -377,7 +382,8 @@ class Enricher:
                         temperature=config.temperature,
                         output_name=output_conf.name,
                         output_schema=output_schema,
-                        prompt=rendered_prompt
+                        prompt=rendered_prompt,
+                        log_requests=log_requests
                     )
                     
                     # Process the actual provider result
@@ -616,6 +622,7 @@ class Enricher:
         output_name: str,
         output_schema: Dict[str, Any],
         prompt: Optional[str] = None,
+        log_requests: bool = False
     ):
         """Call the OpenAI API with appropriate error handling and detailed logging."""
         import json
@@ -684,10 +691,11 @@ class Enricher:
                     "response_format": response_format
                 }
 
-                # Log the complete request
-                logger.info("========== OPENAI REQUEST ==========")
-                logger.info(json.dumps(request_payload, indent=2))
-                logger.info("====================================")
+                # Log the complete request if requested
+                if log_requests:
+                    print("========== OPENAI REQUEST ==========", flush=True) # Added flush=True
+                    print(json.dumps(request_payload, indent=2), flush=True)
+                    print("====================================", flush=True)
 
                 # Make the API call using the new response_format parameter
                 try:
@@ -701,10 +709,11 @@ class Enricher:
                         response_format=response_format
                     )
 
-                    # Log the complete response
-                    logger.info("========== OPENAI RESPONSE ==========")
-                    logger.info(json.dumps(response.model_dump(), indent=2, default=str))
-                    logger.info("======================================")
+                    # Log the complete response if requested
+                    if log_requests:
+                        print("========== OPENAI RESPONSE ==========", flush=True) # Added flush=True
+                        print(json.dumps(response.model_dump(), indent=2, default=str), flush=True)
+                        print("======================================", flush=True)
 
                     # Parse the structured JSON content returned by the model
                     if (

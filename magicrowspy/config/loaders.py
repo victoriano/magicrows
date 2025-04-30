@@ -1,36 +1,85 @@
 """Functions for loading configurations from files."""
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Dict, Any, Union
+import importlib.resources
 
 from .models import AIEnrichmentBlockConfig
 
-def load_preset(ts_file_path: Union[str, Path]) -> AIEnrichmentBlockConfig:
-    """Loads an AIEnrichmentBlockConfig from a TypeScript (.ts) preset file.
+logger = logging.getLogger('magicrowspy')
 
-    Assumes the file contains exactly one exported configuration object assigned
-    using `export const someName ... = { ... };`.
-    Uses simple string/regex matching to find the first such assignment
-    and extracts the object literal, assuming it's JSON-compatible.
+# Helper function to get path to a built-in preset
+def _get_bundled_preset_path(preset_name: str) -> Path:
+    """Gets the absolute path to a preset file bundled with the package."""
+    try:
+        # Use importlib.resources to find the file within the package's 'presets' dir
+        # Ensures it works even if the package is installed (zipped or not)
+        resource_path = importlib.resources.files('magicrowspy.presets').joinpath(preset_name)
+        
+        # Need context manager to get a usable file path, especially from zip installs
+        with importlib.resources.as_file(resource_path) as file_path:
+            logger.debug(f"Resolved bundled preset '{preset_name}' to path: {file_path}")
+            return file_path # Return the Path object from the context
+            
+    except (ModuleNotFoundError, FileNotFoundError, NotADirectoryError, Exception) as e:
+         # Catch potential errors during resource resolution
+        logger.error(f"Error locating bundled preset '{preset_name}': {e}", exc_info=True)
+        raise FileNotFoundError(
+            f"Could not locate the built-in preset '{preset_name}'. "
+            f"Ensure 'magicrowspy' is installed correctly and the 'presets' directory is included as package data. "
+            f"Original error: {type(e).__name__}: {e}"
+        )
 
-    WARNING: This is fragile and sensitive to formatting changes in the .ts file.
-             It is NOT a full TypeScript parser.
+def load_preset(config_source: Union[str, Path, AIEnrichmentBlockConfig]) -> AIEnrichmentBlockConfig:
+    """Loads and validates the AI enrichment configuration.
 
     Args:
-        ts_file_path: Path to the .ts file.
+        config_source: 
+            - A string filename (e.g., "ISCOTasks_preset.ts") assumed to be a bundled preset.
+            - A string absolute/relative path to a .ts file.
+            - A Path object pointing to a .ts file.
+            - A pre-validated AIEnrichmentBlockConfig object (passed through).
 
     Returns:
-        An instance of AIEnrichmentBlockConfig.
+        A validated AIEnrichmentBlockConfig object.
 
     Raises:
-        FileNotFoundError: If the ts_file_path does not exist.
-        ValueError: If a suitable config object export or a valid JSON object cannot be found/parsed.
-        IOError: If the file cannot be read.
+        FileNotFoundError: If the specified file cannot be found.
+        InvalidConfigurationError: If validation fails.
+        TypeError: If config_source is of an unsupported type.
     """
-    ts_path = Path(ts_file_path)
+    if isinstance(config_source, AIEnrichmentBlockConfig):
+        logger.debug("Configuration source is already a validated object.")
+        # TODO: Potentially re-validate here? For now, assume it's valid if passed.
+        return config_source
+
+    ts_path: Path
+    if isinstance(config_source, Path):
+        logger.debug(f"Configuration source is a Path object: {config_source}")
+        ts_path = config_source.resolve()
+    elif isinstance(config_source, str):
+        logger.debug(f"Configuration source is a string: '{config_source}'")
+        potential_path = Path(config_source)
+        # Check if it's an absolute path OR an existing file relative to CWD
+        if potential_path.is_absolute() or potential_path.is_file():
+            logger.info(f"Treating string source '{config_source}' as an explicit file path.")
+            ts_path = potential_path.resolve()
+        else:
+            # Assume it's a path relative to the bundled presets directory
+            logger.info(f"Assuming '{config_source}' is a bundled preset path relative to 'magicrowspy.presets'. Locating...")
+            ts_path = _get_bundled_preset_path(config_source) # Pass the relative path (e.g., "ISCO/file.ts")
+    else:
+        raise TypeError(
+            "config_source must be a string (filename or path), Path, or AIEnrichmentBlockConfig object."
+        )
+
+    logger.info(f"Attempting to load preset configuration from: {ts_path}")
     if not ts_path.is_file():
+        # Log before raising
+        logger.error(f"Preset file not found at resolved path: {ts_path}")
         raise FileNotFoundError(f"TypeScript config file not found: {ts_path}")
 
     try:

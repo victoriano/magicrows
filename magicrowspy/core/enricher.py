@@ -1,23 +1,75 @@
 """Core data enrichment orchestrator."""
 
 import logging
-from typing import List, Union, Dict, Any, Optional
-from pathlib import Path # Add Path import
+from typing import List, Union, Dict, Any, Optional, Tuple, Type
+from pathlib import Path 
 from jinja2 import Environment, Template
-import jsonschema # For validation after getting result
-import json # For parsing JSON string from OpenAI
-import os # To potentially read API keys from environment
-import itertools # Added for Cartesian product
+import jsonschema 
+import json 
+import os 
+import itertools 
+import time 
+import asyncio 
+import math
+import sys
+
+# Import pandas and polars safely
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+
+try:
+    import polars as pl
+    POLARS_AVAILABLE = True
+except ImportError:
+    POLARS_AVAILABLE = False
+    pl = None
+
+# Define DataFrameType based on available libraries
+if PANDAS_AVAILABLE and POLARS_AVAILABLE:
+    DataFrameType = Union[pd.DataFrame, pl.DataFrame]
+    SeriesType = Union[pd.Series, pl.Series]
+elif PANDAS_AVAILABLE:
+    DataFrameType = pd.DataFrame
+    SeriesType = pd.Series
+elif POLARS_AVAILABLE:
+    DataFrameType = pl.DataFrame
+    SeriesType = pl.Series
+else:
+    DataFrameType = Any
+    SeriesType = Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+# Attempt to import OpenAI client and exceptions
+try:
+    import openai
+    from openai import OpenAI, AsyncOpenAI, APIError, RateLimitError, APITimeoutError, BadRequestError
+    OPENAI_AVAILABLE = True
+except ImportError:
+    openai = None
+    OpenAI = None
+    AsyncOpenAI = None
+    APIError = Exception
+    RateLimitError = Exception
+    APITimeoutError = Exception
+    BadRequestError = Exception 
+    OPENAI_AVAILABLE = False
+    logger = logging.getLogger('magicrowspy')
+    logger.warning("OpenAI client not installed. `pip install openai` or `poetry add openai`")
 
 # Configuration Models
 from magicrowspy.config import (
     AIEnrichmentBlockConfig,
-    BaseProviderConfig,
-    OpenAIProviderConfig, # Example
+    BaseProviderConfig, 
+    # ProviderConfig,     # Removed as it's not directly exported/needed here
+    OpenAIProviderConfig, 
     OutputFormat,
-    load_preset # Import load_preset
+    OutputType,         # Ensure OutputType is imported here
+    load_preset 
 )
 from magicrowspy.config.models import (
     RunMode,
@@ -26,38 +78,24 @@ from magicrowspy.config.models import (
 )
 from magicrowspy.utils.schema_generator import generate_json_schema
 
-# Type Hinting for DataFrames (requires optional deps installed)
-try:
-    import pandas as pd
-    PandasDataFrame = pd.DataFrame
-except ImportError:
-    pd = None
-    PandasDataFrame = Any
-
-try:
-    import polars as pl
-    PolarsDataFrame = pl.DataFrame
-except ImportError:
-    pl = None
-    PolarsDataFrame = Any
-
-DataFrameType = Union[PandasDataFrame, PolarsDataFrame]
+from magicrowspy.core.provider_handler import ProviderHandler 
+from magicrowspy.core.prompt_builder import PromptBuilder 
 
 # Use a logger specific to the library
 logger = logging.getLogger('magicrowspy')
 
-# Attempt to import OpenAI client and exceptions *before* class definition
-try:
-    # Attempt to import OpenAI client
-    import openai
-    from openai import OpenAI, APIError, RateLimitError, APITimeoutError
-except ImportError:
-    openai = None
-    OpenAI = None
-    APIError = Exception
-    RateLimitError = Exception
-    APITimeoutError = Exception
-    logger.warning("OpenAI client not installed. `pip install openai` or `poetry add openai`")
+# --- Helper Functions --- #
+
+def _get_dataframe_type(df: Any) -> str:
+    """Checks if the input is a pandas or polars DataFrame."""
+    if PANDAS_AVAILABLE and isinstance(df, pd.DataFrame):
+        return "pandas"
+    elif POLARS_AVAILABLE and isinstance(df, pl.DataFrame):
+        return "polars"
+    else:
+        return "unsupported"
+
+# --- Main Enricher Class --- #
 
 class Enricher:
     """Orchestrates the AI enrichment process for dataframes."""
@@ -86,673 +124,325 @@ class Enricher:
         self,
         input_df: DataFrameType,
         config_source: Union[str, Path, AIEnrichmentBlockConfig],
-        reasoning: bool = True,
-        log_requests: bool = False
+        log_requests: bool = False,
+        log_summary: bool = False 
     ) -> DataFrameType:
-        """Enriches the input dataframe based on the provided configuration.
+        """Enriches the input dataframe based on the provided configuration, with options for logging requests and a final summary."""
+        start_total_time = time.perf_counter()
+        total_aggregated_usage = {
+            'prompt_tokens': 0,
+            'completion_tokens': 0,
+            'total_tokens': 0,
+            'successful_calls': 0
+        }
+        total_api_duration_across_batches = 0.0
+        total_rows_processed = 0
+        total_batches = 0
 
-        Args:
-            input_df: The pandas or polars DataFrame to enrich.
-            config_source: Either the path (str or Path) to a .ts preset file 
-                           or a pre-validated AIEnrichmentBlockConfig object.
-            reasoning: If True, include columns with AI reasoning (default: True).
-            log_requests: If True, log the detailed request and response to the AI provider (default: False).
+        # Determine DataFrame type and load configuration
+        df_type = _get_dataframe_type(input_df)
+        if df_type == "unsupported":
+            raise ValueError("Input data must be a pandas or polars DataFrame.")
 
-        Returns:
-            A new DataFrame (same type as input) with enriched data.
+        # Load configuration (handling bundled vs. external paths)
+        config = load_preset(config_source)
 
-        Raises:
-            ValueError: If configuration is invalid or required columns are missing.
-            RuntimeError: If AI provider calls fail after retries.
-            TypeError: If the input is not a supported DataFrame type or config_source is invalid.
-            FileNotFoundError: If config_source is a path and the file is not found.
-        """
-        # 1. Load and validate config if path is provided
-        if isinstance(config_source, (str, Path)):
-            logger.info(f"Loading enrichment config from path: {config_source}")
+        # --- Batch Processing --- #
+        batch_size = 10 
+        num_batches = math.ceil(len(input_df) / batch_size)
+        results_list = []
+
+        # Display progress bar
+        logger.info(f"Starting enrichment process for {len(input_df)} rows in {num_batches} batches.")
+        try:
+            from tqdm.asyncio import tqdm_asyncio
+            progress_bar = tqdm_asyncio
+        except ImportError:
             try:
-                config = load_preset(config_source)
-            except Exception as e:
-                logger.error(f"Failed to load or validate preset from {config_source}: {e}")
-                raise # Re-raise the exception from load_preset
-        elif isinstance(config_source, AIEnrichmentBlockConfig):
-            logger.info("Using pre-validated enrichment config object.")
-            config = config_source
-        else:
-            raise TypeError("config_source must be a file path (str/Path) or an AIEnrichmentBlockConfig object.")
+                from tqdm.notebook import tqdm as tqdm_notebook
+                if 'ipykernel' in sys.modules:
+                    logger.warning("Using tqdm.notebook for progress; behavior in pure async environments may vary.")
+                    progress_bar = lambda iterable, **kwargs: tqdm_notebook(iterable, **kwargs)
+                else:
+                    logger.warning("tqdm not found. Progress bar disabled. Install tqdm for progress updates.")
+                    progress_bar = lambda iterable, **kwargs: iterable
+            except ImportError:
+                logger.warning("tqdm not found. Progress bar disabled. Install tqdm for progress updates.")
+                progress_bar = lambda iterable, **kwargs: iterable
 
-        logger.info(f"Starting enrichment process with mode: {config.mode}")
+        for i in progress_bar(range(num_batches), total=num_batches, desc="Enriching Batches"):
+            batch_start_index = i * batch_size
+            batch_end_index = min((i + 1) * batch_size, len(input_df))
+            batch_df = input_df[batch_start_index:batch_end_index]
 
-        # 2. Validate provider
-        provider_name = config.integrationName
-        if provider_name not in self.providers:
-            raise ValueError(
-                f"Provider '{provider_name}' specified in enrichment config "
-                f"was not found in the initialized providers: {list(self.providers.keys())}"
+            if not batch_df.empty:
+                total_batches += 1
+                
+                # Determine the correct gather function based on tqdm availability
+                gather_func = progress_bar.gather if hasattr(progress_bar, 'gather') else asyncio.gather
+                
+                batch_results, batch_usage, batch_api_duration = await self._process_batch(
+                    batch_df,
+                    config,
+                    log_requests,
+                    gather_func # Pass the gather function
+                )
+                results_list.extend(batch_results)
+                total_api_duration_across_batches += batch_api_duration
+                total_rows_processed += len(batch_df)
+
+                if batch_usage:
+                    total_aggregated_usage['prompt_tokens'] += batch_usage.get('prompt_tokens', 0)
+                    total_aggregated_usage['completion_tokens'] += batch_usage.get('completion_tokens', 0)
+                    total_aggregated_usage['total_tokens'] += batch_usage.get('total_tokens', 0)
+                    total_aggregated_usage['successful_calls'] += batch_usage.get('successful_calls', 0)
+
+        # --- Post-processing --- #
+        output_df = self._convert_to_dataframe(results_list, df_type)
+
+        end_total_time = time.perf_counter()
+        total_duration_seconds = end_total_time - start_total_time
+        processing_duration_seconds = total_duration_seconds - total_api_duration_across_batches
+
+        if log_summary:
+            COST_PER_MILLION_INPUT_TOKENS = 5.00
+            COST_PER_MILLION_OUTPUT_TOKENS = 15.00
+
+            input_cost = (total_aggregated_usage['prompt_tokens'] / 1_000_000) * COST_PER_MILLION_INPUT_TOKENS
+            output_cost = (total_aggregated_usage['completion_tokens'] / 1_000_000) * COST_PER_MILLION_OUTPUT_TOKENS
+            total_cost = input_cost + output_cost
+
+            avg_api_time_per_call = (
+                total_api_duration_across_batches / total_aggregated_usage['successful_calls']
+                if total_aggregated_usage['successful_calls'] > 0 else 0.0
             )
-        provider_conf = self.providers[provider_name]
-        # TODO: Add more validation (e.g., check context columns exist in df)
+            avg_total_time_per_row = total_duration_seconds / total_rows_processed if total_rows_processed > 0 else 0.0
 
-        # 3. Determine DataFrame type and select appropriate processing strategy
-        is_pandas = pd is not None and isinstance(input_df, pd.DataFrame)
-        is_polars = pl is not None and isinstance(input_df, pl.DataFrame)
+            print("\n========== Enrichment Summary ==========", flush=True)
+            print(f"Total Rows Processed: {total_rows_processed}", flush=True)
+            print(f"Total Batches:        {total_batches}", flush=True)
+            print(f"Successful API Calls: {total_aggregated_usage['successful_calls']}", flush=True)
+            print("------------------------------------", flush=True)
+            print(f"Total Time Elapsed:   {total_duration_seconds:.4f} s", flush=True)
+            print(f"Total API Time:       {total_api_duration_across_batches:.4f} s", flush=True)
+            print(f"Total Processing Time:{processing_duration_seconds:.4f} s (Total - API)", flush=True)
+            print(f"Avg. API Time/Call:   {avg_api_time_per_call:.4f} s", flush=True)
+            print(f"Avg. Total Time/Row:  {avg_total_time_per_row:.4f} s", flush=True)
+            print("------------------------------------", flush=True)
+            print(f"Input Tokens:         {total_aggregated_usage['prompt_tokens']}", flush=True)
+            print(f"Output Tokens:        {total_aggregated_usage['completion_tokens']}", flush=True)
+            print(f"Total Tokens:         {total_aggregated_usage['total_tokens']}", flush=True)
+            print("------------------------------------", flush=True)
+            print(f"Estimated Input Cost: ${input_cost:.6f} (@ ${COST_PER_MILLION_INPUT_TOKENS}/M)", flush=True)
+            print(f"Estimated Output Cost:${output_cost:.6f} (@ ${COST_PER_MILLION_OUTPUT_TOKENS}/M)", flush=True)
+            print(f"Estimated Total Cost: ${total_cost:.6f}", flush=True)
+            print("======================================\n", flush=True)
 
-        if not is_pandas and not is_polars:
-            raise TypeError("Input must be a pandas or polars DataFrame.")
-
-        if is_pandas:
-            logger.debug("Processing with pandas backend.")
-            # Pass the loaded/validated config object
-            return await self._enrich_pandas(input_df, config, provider_conf, reasoning, log_requests)
-        elif is_polars:
-            logger.debug("Processing with polars backend.")
-            # Pass the loaded/validated config object
-            return await self._enrich_polars(input_df, config, provider_conf, reasoning, log_requests)
-        else:
-            # Should be unreachable due to the earlier check
-            raise TypeError("Unsupported DataFrame type.") 
-
-    async def _enrich_pandas(
-        self,
-        df: PandasDataFrame,
-        config: AIEnrichmentBlockConfig,
-        provider_conf: BaseProviderConfig,
-        reasoning: bool,
-        log_requests: bool
-    ):
-        logger.info(f"--- Entering _enrich_pandas --- Mode: {config.mode}, Format: {config.outputFormat} (Type: {type(config.outputFormat)}) ---")
-        
-        # Determine which columns to keep in preview mode
-        preview_columns_to_keep = []
-        if config.mode == RunMode.PREVIEW:
-            # If we're in PREVIEW mode, we need to limit the number of rows
-            preview_row_count = getattr(config, "previewRowCount", 3)
-            # Get up to N rows
-            # We do this after all checks are done
-            df = df.head(preview_row_count)
-        
-        # Extract temp_df for easier manipulations
-        if isinstance(df, pd.DataFrame):
-            temp_df = df
-        else:
-            temp_df = df.to_pandas()
-        
-        # Create the results DataFrame with all output columns and <NA>
-        results_dict_list = []
-        
-        # Create a mapping of output names to their configuration
-        output_name_to_config = {output.name: output for output in config.outputs}
-        
-        # Generate fallback reasoning for all output fields
-        fallback_reasonings = {}
-        for output_config in config.outputs:
-            field = output_config.name
-            includes_reasoning = getattr(output_config, "includeReasoning", False)
-            field_reasoning = f"{field}_reasoning"
-            
-            # Generate a fallback reasoning relevant to the specific field
-            if field == "novelty_rating":
-                fallback_reasonings[field] = "The novelty_rating assessment is based on analyzing the task description, required skills, and industry context. This evaluation considers both traditional job components and innovative aspects of the role."
-            elif field == "best_country_match":
-                fallback_reasonings[field] = "The best_country_match is determined by analyzing labor market conditions, skill availability, economic factors, and regulatory environment in different countries relevant to this profession and industry."
-            else:
-                # Generic fallback reasoning for other fields
-                fallback_reasonings[field] = f"The {field} was determined by analyzing the available data and applying domain expertise to extract meaningful patterns and relationships."
-                
-        # Process each row
-        for index, row in temp_df.iterrows():
-            row_result = {"original_index": index}
-            
-            # Create empty results for each output
-            for output_config in config.outputs:
-                field = output_config.name
-                includes_reasoning = getattr(output_config, "includeReasoning", False)
-                
-                # Add the main output field
-                row_result[field] = pd.NA
-                
-                # Add the reasoning field if required
-                if includes_reasoning and reasoning:
-                    field_reasoning = f"{field}_reasoning"
-                    row_result[field_reasoning] = pd.NA
-            
-            # Process each output for the current row
-            for output_config in config.outputs:
-                field = output_config.name
-                includes_reasoning = getattr(output_config, "includeReasoning", False)
-                
-                # Create template for the prompt
-                template = output_config.prompt
-                rendered_prompt = self._render_prompt(template, row)
-                
-                # Generate the schema, passing the reasoning flag
-                schema = generate_json_schema(output_config, reasoning)
-                
-                # Get provider config from parent config or use default
-                model = getattr(config, "model", "gpt-4")
-                temperature = getattr(config, "temperature", 0.7)
-                
-                try:
-                    # Call the AI provider
-                    result = self._call_provider(
-                        provider_conf=provider_conf,
-                        model=model,
-                        temperature=temperature,
-                        output_name=field,
-                        output_schema=schema,
-                        prompt=rendered_prompt,
-                        log_requests=log_requests
-                    )
-                    
-                    # Debug the result from the provider
-                    logger.debug(f"Provider result for {field}: {result}")
-
-                    # Process the actual result from the provider
-                    if result and field in result:
-                        provider_data = result[field] # This is either the value or {"value": ..., "reasoning": ...}
-                        
-                        if includes_reasoning and reasoning:
-                            if isinstance(provider_data, dict) and "value" in provider_data:
-                                # Correctly extract the value (can be single item or list)
-                                row_result[field] = provider_data.get("value", pd.NA) 
-                                row_result[f"{field}_reasoning"] = provider_data.get("reasoning", pd.NA)
-                            else:
-                                # Handle cases where reasoning was expected but not returned correctly
-                                logger.warning(f"Reasoning requested but provider did not return expected structure for {field}. Setting to NA.")
-                                row_result[field] = pd.NA # Fallback
-                                row_result[f"{field}_reasoning"] = pd.NA # Fallback
-                        else: # Reasoning not requested or not included in preset
-                            # Value should be directly under the field name in the result
-                            row_result[field] = provider_data # Assign the direct value
-
-                    else:
-                        # Handle cases where provider call failed or returned unexpected structure
-                        logger.warning(f"No valid result from provider for {field}. Setting to NA.")
-                        row_result[field] = pd.NA
-                        if includes_reasoning and reasoning:
-                            row_result[f"{field}_reasoning"] = pd.NA
-                
-                except Exception as e:
-                    logger.error(f"Error processing row {index} for output {field}: {e}")
-                    # Ensure fallback NA values remain if error occurs
-                    row_result[field] = pd.NA
-                    if includes_reasoning and reasoning:
-                        row_result[f"{field}_reasoning"] = pd.NA
-            
-            # Only add the row_result to results_dict_list after all outputs have been processed
-            results_dict_list.append(row_result)
-        
-        # Create DataFrame from the list of dictionaries
-        temp_results_df = pd.DataFrame(results_dict_list)
-        logger.debug(f"Temp results DataFrame before setting index:\n{temp_results_df}")
-        # Set the original index as the DataFrame index BEFORE handling preview
-        results_df = temp_results_df.set_index('original_index')
-        logger.debug(f"Results DataFrame after setting index:\n{results_df}")
-        
-        # Align with original DataFrame length if preview was used
-        if config.mode == RunMode.PREVIEW and len(results_df) < len(df):
-            # Reindex results_df to match the full original df index, filling missing with NA
-            results_aligned_df = results_df.reindex(df.index)
-            logger.debug(f"Results DataFrame after reindexing for preview:\n{results_aligned_df}")
-            output_df = pd.concat([df, results_aligned_df], axis=1)
-            logger.debug(f"Output DataFrame after concat:\n{output_df}")
-        else:
-            # Ensure results_df index matches df index if not in preview (should match if processed all rows)
-            results_df = results_df.reindex(df.index) # Reindex ensures alignment
-            output_df = pd.concat([df, results_df], axis=1)
-            logger.debug(f"Output DataFrame after concat (regular merge):\n{output_df}")
+        logger.info("Enrichment process completed.")
         return output_df
 
-    async def _enrich_polars(
-        self,
-        df: 'pl.DataFrame',
-        config: AIEnrichmentBlockConfig,
-        provider_conf: BaseProviderConfig,
-        reasoning: bool,
-        log_requests: bool
-    ) -> 'pl.DataFrame':
-        """Enrichment logic for Polars DataFrames, including reasoning."""
-        provider_conf = next((p for p in self.providers if p.integrationName == config.integrationName), None)
-        if not provider_conf:
-            raise ValueError(f"Provider '{config.integrationName}' not found.")
-
-        logger.info(f"Processing {len(df)} rows with Polars.")
-
-        # Handle preview mode
-        if config.mode == RunMode.PREVIEW:
-            rows_to_process = config.previewRowCount or 5 # Default preview rows if not set
-            logger.info(f"Processing {rows_to_process} rows (mode: RunMode.PREVIEW).")
-            process_df = df.head(rows_to_process)
-        elif config.mode == RunMode.FULL:
-            rows_to_process = len(df)
-            logger.info(f"Processing {rows_to_process} rows (mode: RunMode.FULL).")
-            process_df = df
+    def _convert_to_dataframe(self, data: List[Dict[str, Any]], df_type: str) -> DataFrameType:
+        if df_type == "pandas":
+            return pd.DataFrame(data)
+        elif df_type == "polars":
+            return pl.DataFrame(data)
         else:
-            # Should not happen with Pydantic validation, but safeguard
-            raise ValueError(f"Unsupported mode: {config.mode}")
+            raise ValueError("Unsupported DataFrame type.")
 
-        # Prepare Jinja environment
-        jinja_env = Environment()
+    @retry(stop=stop_after_attempt(3), 
+           wait=wait_exponential(multiplier=1, min=4, max=10),
+           retry=retry_if_exception_type((APIError, RateLimitError, APITimeoutError)))
+    async def _call_provider(
+        self,
+        provider_handler: ProviderHandler,
+        prompt: str,
+        output_config: OutputConfig,
+        config: AIEnrichmentBlockConfig,
+        row_data: Dict[str, Any],
+        log_requests: bool
+    ) -> Tuple[Optional[Any], Optional[Dict[str, int]], float]:
+        start_api_time = time.perf_counter()
+        usage_stats = None
+        parsed_content = None
+        response = None
+        
+        try:
+            if log_requests:
+                logger.info(f"\n--- Request ---\nRow: {row_data.get('<row_index>', 'N/A')}\nOutput: {output_config.name}\nPrompt:\n{prompt}\n---------------")
 
-        # --- Data Collection using map_rows --- 
-        # We need to process each row individually to call the API
-        all_row_results: List[Dict[str, Any]] = [] 
+            response = await provider_handler.generate_completion(
+                model=config.model,
+                prompt=prompt,
+                temperature=config.temperature,
+                output_config=output_config
+            )
 
-        # Polars map_rows expects a function that takes a tuple of row values
-        # It's often easier to convert the row to a dict inside the function
-        # Alternatively, iterate using df.iter_rows(named=True)
-
-        # Using iter_rows for simplicity in accessing columns by name
-        for row_dict in process_df.iter_rows(named=True):
-            row_results: Dict[str, Any] = {} # Results for this specific row
-            logger.debug(f"Processing row: {row_dict}") # Log subset for brevity
-
-            for output_conf in config.outputs:
-                # 1. Determine Context
-                context_cols = output_conf.contextColumns or config.contextColumns
-                missing_cols = [col for col in context_cols if col not in df.columns]
-                if missing_cols:
-                    raise ValueError(f"Missing required context columns in DataFrame: {missing_cols}")
-                
-                prompt_context = {col: row_dict[col] for col in context_cols}
-
-                # 2. Render Prompt
+            parsed_content = provider_handler.parse_response(response, output_config)
+            usage_stats = provider_handler.extract_usage(response) 
+            if usage_stats: 
+                 usage_stats['successful_calls'] = 1
+                 
+            if output_config.outputType == OutputType.JSON and output_config.outputSchema:
                 try:
-                    template = jinja_env.from_string(output_conf.prompt)
-                    rendered_prompt = template.render(prompt_context)
-                except Exception as e:
-                    logger.error(f"Jinja prompt rendering failed for output '{output_conf.name}': {e}")
-                    row_results[output_conf.name] = None
-                    continue
-
-                # 3. Generate Schema
-                try:
-                    # Pass the reasoning flag here as well
-                    output_schema = generate_json_schema(output_conf, reasoning)
-                except ValueError as e:
-                    logger.error(f"Failed to generate schema for output '{output_conf.name}': {e}")
-                    row_results[output_conf.name] = None
-                    continue
-
-                # 4. Call Provider
-                try:
-                    provider_result = self._call_provider(
-                        provider_conf=provider_conf,
-                        model=config.model,
-                        temperature=config.temperature,
-                        output_name=output_conf.name,
-                        output_schema=output_schema,
-                        prompt=rendered_prompt,
-                        log_requests=log_requests
-                    )
+                    jsonschema.validate(instance=parsed_content, schema=output_config.outputSchema)
+                except jsonschema.ValidationError as e:
+                    logger.error(f"Schema validation failed for row {row_data.get('<row_index>', 'N/A')}, output '{output_config.name}': {e}")
+                    parsed_content = {"error": f"Schema validation failed: {e.message}"} 
+                    if usage_stats: usage_stats['successful_calls'] = 0 
                     
-                    # Process the actual provider result
-                    if provider_result and output_conf.name in provider_result:
-                        row_results[output_conf.name] = provider_result[output_conf.name]
-                        logger.debug(f"Stored actual result for '{output_conf.name}': {row_results[output_conf.name]}")
-                    else:
-                        logger.warning(f"No valid result from provider for {output_conf.name} in Polars enrich. Setting to None.")
-                        row_results[output_conf.name] = None
-                        
-                except Exception as e:
-                    logger.error(f"Provider call or validation failed for output '{output_conf.name}': {e}")
-                    row_results[output_conf.name] = None
+            if log_requests:
+                 logger.info(f"\n--- Response ---\nRow: {row_data.get('<row_index>', 'N/A')}\nOutput: {output_config.name}\nContent: {parsed_content}\nUsage: {usage_stats}\n----------------")
 
-            all_row_results.append(row_results)
+        except BadRequestError as e:
+            logger.error(f"Bad Request Error (likely prompt issue) for row {row_data.get('<row_index>', 'N/A')}, output '{output_config.name}': {e}", exc_info=True)
+            parsed_content = {"error": f"API Bad Request: {e}"}
+        except APIError as e:
+            logger.error(f"API Error during enrichment for row {row_data.get('<row_index>', 'N/A')}, output '{output_config.name}': {e}", exc_info=True)
+            parsed_content = {"error": f"API Error: {e}"} 
+            raise 
+        except (RateLimitError, APITimeoutError) as e:
+            logger.warning(f"{type(e).__name__} encountered for row {row_data.get('<row_index>', 'N/A')}, output '{output_config.name}'. Retrying...", exc_info=False)
+            parsed_content = {"error": f"{type(e).__name__}: {e}"} 
+            raise 
+        except Exception as e:
+            logger.error(f"Unexpected error during enrichment for row {row_data.get('<row_index>', 'N/A')}, output '{output_config.name}': {e}", exc_info=True)
+            parsed_content = {"error": f"Unexpected error: {e}"}
 
-        # --- Result Merging --- 
-        if not all_row_results:
-             logger.warning("No results were generated (Polars).")
-             # Determine expected columns even if no results
-             output_columns = config.contextColumns if config.contextColumns else []
-             for o in config.outputs:
-                 output_columns.append(o.name)
-                 if o.includeReasoning and reasoning:
-                     output_columns.append(f"{o.name}_reasoning")
+        finally:
+            end_api_time = time.perf_counter()
+            api_duration = end_api_time - start_api_time
 
-             if config.outputFormat == OutputFormat.NEW_COLUMNS:
-                 # Add empty columns if no results
-                 new_cols_expr = []
-                 for col_name in output_columns:
-                     if col_name not in df.columns:
-                         new_cols_expr.append(pl.lit(None).alias(col_name))
-                 return df.with_columns(new_cols_expr)
-             elif config.outputFormat == OutputFormat.NEW_ROWS:
-                  # Return empty DF with expected columns
-                  return pl.DataFrame({col: [] for col in output_columns}) # Empty DF with schema
-             else:
-                 return df.clone() # Fallback
+        return parsed_content, usage_stats, api_duration
+
+    async def _process_row_item(
+        self,
+        row_tuple: Tuple[int, Any], 
+        config: AIEnrichmentBlockConfig,
+        log_requests: bool,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, int]], float]:
+        row_index, row_data = row_tuple
+        row_data['<row_index>'] = row_index 
+        
+        provider_config = self.providers.get(config.integrationName)
+        if not provider_config:
+            logger.error(f"Provider '{config.integrationName}' not found for row {row_index}.")
+            return {"error": f"Provider '{config.integrationName}' not found"}, None, 0.0
+        
+        if isinstance(provider_config, OpenAIProviderConfig) and OPENAI_AVAILABLE:
+             try:
+                 # Instantiate the ASYNC client
+                 client = AsyncOpenAI(api_key=provider_config.apiKey) 
+                 provider_handler = ProviderHandler(client=client, provider_type='openai') 
+             except Exception as e:
+                 logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
+                 return {"error": f"Failed to initialize provider: {e}"}, None, 0.0
+        else:
+             logger.error(f"Unsupported provider type or OpenAI not available for '{config.integrationName}'.")
+             return {"error": f"Unsupported provider '{config.integrationName}'"}, None, 0.0
+
+        processed_row_data = {} 
+        aggregated_row_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'successful_calls': 0}
+        total_row_api_duration = 0.0
+
+        for output_config in config.outputs:
+            prompt_builder = PromptBuilder(output_config, config.contextColumns)
+            try:
+                prompt = prompt_builder.build_prompt(row_data) 
+            except Exception as e:
+                logger.error(f"Failed to build prompt for row {row_index}, output '{output_config.name}': {e}", exc_info=True)
+                if config.outputFormat == OutputFormat.NEW_COLUMNS:
+                    processed_row_data[output_config.name] = {"error": f"Prompt build failed: {e}"}
+                    if output_config.includeReasoning:
+                         processed_row_data[f"{output_config.name}_reasoning"] = "N/A (Prompt Error)"
+                continue 
+
+            parsed_content, usage_stats, api_duration = await self._call_provider(
+                provider_handler=provider_handler,
+                prompt=prompt,
+                output_config=output_config,
+                config=config,
+                row_data=row_data, 
+                log_requests=log_requests
+            )
+            
+            total_row_api_duration += api_duration
+            if usage_stats:
+                aggregated_row_usage['prompt_tokens'] += usage_stats.get('prompt_tokens', 0)
+                aggregated_row_usage['completion_tokens'] += usage_stats.get('completion_tokens', 0)
+                aggregated_row_usage['total_tokens'] += usage_stats.get('total_tokens', 0)
+                aggregated_row_usage['successful_calls'] += usage_stats.get('successful_calls', 0)
+
+            if config.outputFormat == OutputFormat.NEW_COLUMNS:
+                reasoning_content = "N/A"
+                final_content = parsed_content
+                
+                if isinstance(parsed_content, dict) and 'reasoning' in parsed_content and 'answer' in parsed_content:
+                    reasoning_content = parsed_content.get('reasoning', 'Error extracting reasoning')
+                    final_content = parsed_content.get('answer', {'error': 'Error extracting answer'})
+                    
+                processed_row_data[output_config.name] = final_content
+                if output_config.includeReasoning:
+                    processed_row_data[f"{output_config.name}_reasoning"] = reasoning_content
+
+            elif config.outputFormat == OutputFormat.NEW_ROWS:
+                 processed_row_data[output_config.name] = parsed_content 
 
         if config.outputFormat == OutputFormat.NEW_COLUMNS:
-            logger.info("Merging results as new columns (Polars).")
-            
-            # Prepare expressions for new columns
-            new_column_expressions = []
-            all_output_column_names = [] # Includes reasoning names
-            
-            for output_conf in config.outputs:
-                output_name = output_conf.name
-                reasoning_name = f"{output_name}_reasoning"
-                all_output_column_names.append(output_name)
-                if output_conf.includeReasoning and reasoning:
-                    all_output_column_names.append(reasoning_name)
-                
-                # Extract values and reasoning for this output across all rows
-                values = []
-                reasonings = [] if output_conf.includeReasoning and reasoning else None
-                
-                for row_result in all_row_results:
-                    result_data = row_result.get(output_name) # Now gets {'value': ..., 'reasoning': ...}
-                    final_value = None
-                    final_reasoning = None
-
-                    # Check if reasoning was included for this output
-                    if output_conf.includeReasoning and reasoning:
-                        if isinstance(result_data, dict) and "value" in result_data:
-                            # Extract nested value and reasoning
-                            nested_value_dict = result_data.get("value", {})
-                            # The actual value is inside the nested dict, keyed by the field name
-                            final_value = nested_value_dict.get(output_name, None) 
-                            final_reasoning = result_data.get("reasoning")
-                        else:
-                             # Reasoning expected but not found in correct structure
-                            logger.warning(f"Reasoning ON for {output_name} (Polars), but structure unexpected: {result_data}. Storing raw data.")
-                            final_value = result_data # Store whatever was returned
-                            # final_reasoning remains None
-                    elif result_data is not None:
-                        # Reasoning was OFF, result_data is the direct value
-                        final_value = result_data
-                        # final_reasoning remains None
-                    # else: result_data is None, final_value/reasoning remain None
-                    
-                    values.append(final_value)
-                    if output_conf.includeReasoning and reasoning:
-                        reasonings.append(final_reasoning)
-
-                # Handle preview mode: Pad with nulls if necessary
-                if config.mode == RunMode.PREVIEW and len(values) < len(df):
-                    num_missing = len(df) - len(values)
-                    values.extend([None] * num_missing)
-                    if output_conf.includeReasoning and reasoning:
-                        reasonings.extend([None] * num_missing)
-                
-                # Create Polars Series and add expression
-                # TODO: Infer schema or handle types more robustly? Polars might handle Series auto-detection.
-                new_column_expressions.append(pl.Series(output_name, values).alias(output_name))
-                if output_conf.includeReasoning and reasoning:
-                    new_column_expressions.append(pl.Series(reasoning_name, reasonings).alias(reasoning_name))
-
-            # Add all new columns at once
-            output_df = df.with_columns(new_column_expressions)
-            return output_df
-
+            original_data = {k: v for k, v in row_data.items() if k != '<row_index>'}
+            final_row_output = {**original_data, **processed_row_data}
         elif config.outputFormat == OutputFormat.NEW_ROWS:
-            logger.info("Generating new rows from results (Polars).")
-            new_rows_list = [] # List of dictionaries, each representing a new row
+            original_keys = {k: v for k, v in row_data.items() if k in config.contextColumns or k == '<row_index>'}
+            final_row_output = {**original_keys, **processed_row_data}
+        else: 
+             final_row_output = {"error": "Invalid outputFormat"}
+             
+        return final_row_output, aggregated_row_usage, total_row_api_duration
 
-            processed_input_df = df.head(len(all_row_results)) # Get the part of the df that was processed
-
-            output_config_map = {o.name: o for o in config.outputs}
-            all_output_column_names = []
-            for o in config.outputs:
-                all_output_column_names.append(o.name)
-                if o.includeReasoning and reasoning:
-                    all_output_column_names.append(f"{o.name}_reasoning")
-
-            for i, row_result in enumerate(all_row_results):
-                original_row = processed_input_df.row(i, named=True) # Get original row as dict
-                context_data = {col: original_row[col] for col in config.contextColumns}
-
-                # --- Prepare lists of values for Cartesian product --- 
-                output_data_for_product = [] # Will store list of [{'value': v, 'reasoning': r}, ...]
-                output_names_in_product_order = [] # Just the names
-
-                for output_conf in config.outputs:
-                    output_name = output_conf.name
-                    result_dict = row_result.get(output_name) # Now gets {'value': ..., 'reasoning': ...}
-                    values_to_process = [] # List to hold dicts {'value': v, 'reasoning': r}
-
-                    if result_dict is None or (isinstance(result_dict, dict) and result_dict.get("value") is None):
-                        # If an output is missing or value is None, use [{'value': None, 'reasoning': None}]
-                        # so combinations are still generated
-                        current_reasoning = result_dict.get("reasoning") if isinstance(result_dict, dict) else None
-                        values_to_process = [{'value': None, 'reasoning': current_reasoning}]
-                    elif output_conf.outputCardinality == OutputCardinality.MULTIPLE:
-                        value_list = None
-                        reasoning_for_all = None
-                        # Check if reasoning is included to determine structure
-                        if output_conf.includeReasoning and reasoning:
-                            # Expects {'value': [...], 'reasoning': '...'} 
-                            if isinstance(result_dict, dict) and isinstance(result_dict.get("value"), list):
-                                value_list = result_dict["value"] if result_dict["value"] else [None]
-                                reasoning_for_all = result_dict.get("reasoning")
-                            else:
-                                # Handle unexpected structure when reasoning is ON
-                                logger.warning(
-                                    f"Output '{output_name}' (Polars) is MULTIPLE with reasoning ON, but result is not structured as expected: {result_dict}. Treating as single None."
-                                )
-                                value_list = [None]
-                                reasoning_for_all = result_dict.get("reasoning") if isinstance(result_dict, dict) else None 
-                        else:
-                            # Expects direct list [...] when reasoning is OFF
-                            if isinstance(result_dict, list):
-                                value_list = result_dict if result_dict else [None]
-                                # reasoning_for_all remains None
-                            else:
-                                # Handle unexpected structure when reasoning is OFF (e.g., not a list)
-                                logger.warning(
-                                    f"Output '{output_name}' (Polars) is MULTIPLE with reasoning OFF, but result is not a list: {result_dict}. Treating as single."
-                                )
-                                value_list = [result_dict] # Wrap non-list value
-                                # reasoning_for_all remains None
-
-                        # Ensure value_list is never empty to avoid issues with itertools.product
-                        if not value_list:
-                            value_list = [None]
- 
-                        # Assume reasoning applies to the whole list for MULTIPLE
-                        values_to_process = [{'value': v, 'reasoning': reasoning_for_all} for v in value_list]
-                    elif output_conf.outputCardinality == OutputCardinality.SINGLE:
-                        values_to_process = [result_dict]
-                    elif result_dict["value"] is not None: # MULTIPLE but not a list, or unexpected type
-                        logger.warning(
-                            f"Output '{output_name}' is MULTIPLE but result value is not a list (Polars) (value: {result_dict.get('value', result_dict)}). Treating as single."
-                        )
-                        values_to_process = [result_dict]
-                    else:
-                       # Handles case where result_dict is a dict {'value': None, 'reasoning': ...}
-                       current_reasoning = result_dict.get("reasoning") if isinstance(result_dict, dict) else None
-                       values_to_process = [{'value': None, 'reasoning': current_reasoning}]
-
-                    output_data_for_product.append(values_to_process)
-                    output_names_in_product_order.append(output_name)
-
-                # --- Generate rows using Cartesian product --- 
-                if not output_data_for_product: # Should not happen if config has outputs
-                   continue 
-
-                combinations = itertools.product(*output_data_for_product)
-
-                for combo in combinations:
-                    new_row = context_data.copy()
-                    for name, result_item in zip(output_names_in_product_order, combo):
-                        output_conf = output_config_map[name]
-                        new_row[name] = result_item['value'] if result_item['value'] is not None else pd.NA
-                        if output_conf.includeReasoning and reasoning:
-                            new_row[f"{name}_reasoning"] = result_item['reasoning'] if result_item['reasoning'] is not None else pd.NA
-                    new_rows_list.append(new_row)
-
-            if not new_rows_list:
-                logger.warning("No new rows generated (Polars).")
-                ordered_columns = config.contextColumns + all_output_column_names
-                return pl.DataFrame({col: [] for col in ordered_columns}) # Empty DF with schema
-
-            output_df = pl.from_dicts(new_rows_list) # Create DataFrame from list of dicts
-            # Ensure correct column order
-            ordered_columns = config.contextColumns + all_output_column_names
-            # Select columns in the desired order, handling potential missing columns
-            existing_ordered_columns = [col for col in ordered_columns if col in output_df.columns]
-            output_df = output_df.select(existing_ordered_columns)
-            return output_df
-
-    def _render_prompt(self, template: str, row_data) -> str:
-        """Render a prompt template using Jinja2 with row data as context."""
-        try:
-            from jinja2 import Template
-            # Convert row data to dictionary if it's a pandas Series
-            if hasattr(row_data, 'to_dict'):
-                context = row_data.to_dict()
-            else:
-                context = dict(row_data)
-            
-            # Create and render the template
-            jinja_template = Template(template)
-            rendered = jinja_template.render(**context)
-            return rendered
-        except Exception as e:
-            logger.error(f"Error rendering prompt template: {e}")
-            # Return the original template as fallback
-            return template
-
-    def _call_provider(
+    async def _process_batch(
         self,
-        provider_conf: BaseProviderConfig,
-        model: str,
-        temperature: float,
-        output_name: str,
-        output_schema: Dict[str, Any],
-        prompt: Optional[str] = None,
-        log_requests: bool = False
-    ):
-        """Call the OpenAI API with appropriate error handling and detailed logging."""
-        import json
-        import os
-        
-        # Log the provider configuration
-        logger.info(f"Provider configuration: {provider_conf}")
-        
-        # Try to get the provider type from provider_conf
-        provider_type = getattr(provider_conf, "providerType", None) 
-        if provider_type is None:
-            provider_type = getattr(provider_conf, "type", "openai")
-        
-        logger.info(f"Using provider type: {provider_type}")
-        
-        # Check if we should use OpenAI
-        if provider_type.lower() == "openai":
-            try:
-                from openai import OpenAI
-                
-                # Get API key from provider_conf or environment
-                api_key = getattr(provider_conf, "apiKey", None) or os.environ.get("OPENAI_API_KEY")
-                if not api_key:
-                    logger.error("No OpenAI API key found. Using fallback values.")
-                    return None
-                
-                # Create OpenAI client
-                client = OpenAI(api_key=api_key)
-                
-                # Improved system prompt with stronger emphasis on providing reasoning
-                system_prompt = """You are a data analysis expert skilled in information extraction and reasoning.
-                Your task is to analyze the provided data and generate structured outputs according to the specified format.
-                
-                IMPORTANT INSTRUCTIONS:
-                1. When reasoning is requested, you MUST provide detailed explanations for your conclusions.
-                2. Follow the exact schema structure in your response, including all nested properties.
-                3. For each output, provide both the value and reasoning as separate fields.
-                4. Be thorough in your reasoning, explaining the factors that influenced your decision.
-                """
-                
-                # Build the JSON-Schema based response_format instead of tools/functions
-                response_format = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": output_name or "structured_output",
-                        "schema": output_schema,
-                        "strict": True
-                    }
-                }
-
-                # Create messages array (already contains system & user above)
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                ]
-                if prompt:
-                    messages.append({"role": "user", "content": prompt})
-
-                # Prepare the request payload for logging purposes only
-                request_payload = {
-                    "model": model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": 1000,
-                    "n": 1,
-                    "stream": False,
-                    "response_format": response_format
-                }
-
-                # Log the complete request if requested
-                if log_requests:
-                    print("========== OPENAI REQUEST ==========", flush=True) # Added flush=True
-                    print(json.dumps(request_payload, indent=2), flush=True)
-                    print("====================================", flush=True)
-
-                # Make the API call using the new response_format parameter
-                try:
-                    response = client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=1000,
-                        n=1,
-                        stream=False,
-                        response_format=response_format
-                    )
-
-                    # Log the complete response if requested
-                    if log_requests:
-                        print("========== OPENAI RESPONSE ==========", flush=True) # Added flush=True
-                        print(json.dumps(response.model_dump(), indent=2, default=str), flush=True)
-                        print("======================================", flush=True)
-
-                    # Parse the structured JSON content returned by the model
-                    if (
-                        hasattr(response, "choices") and response.choices and
-                        hasattr(response.choices[0], "message") and
-                        response.choices[0].message.content
-                    ):
-                        try:
-                            parsed_content = json.loads(response.choices[0].message.content)
-                            # Determine if the parsed_content contains a top-level "value" key (i.e. reasoning mode)
-                            if isinstance(parsed_content, dict) and "value" in parsed_content:
-                                # IncludeReasoning=True -> keep full object {"value": ..., "reasoning": ...}
-                                main_data = parsed_content
-                            elif isinstance(parsed_content, dict) and len(parsed_content) == 1:
-                                # IncludeReasoning=False -> unwrap the single value inside the dict
-                                main_data = list(parsed_content.values())[0]
-                            else:
-                                # Fallback – use parsed_content as-is
-                                main_data = parsed_content
-
-                            return {output_name: main_data}
-                        except json.JSONDecodeError as e:
-                            logger.error(f"Failed to parse JSON content from response: {e}")
-                            logger.error(f"Raw content: {response.choices[0].message.content}")
-                            return None
-                except Exception as e:
-                    logger.error(f"OpenAI API call failed: {str(e)}")
-                    return None
-            except ImportError:
-                logger.error("OpenAI package not installed. Using fallback values.")
-                return None
-            except Exception as e:
-                logger.error(f"Unexpected error in OpenAI provider call: {str(e)}")
-                return None
+        batch_df: DataFrameType,
+        config: AIEnrichmentBlockConfig,
+        log_requests: bool,
+        gather_func: callable # Accept the gather function as argument
+    ) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, int]], float]:
+        """Processes a batch of rows concurrently and aggregates results, usage, and duration."""
+        tasks = []
+        if PANDAS_AVAILABLE and isinstance(batch_df, pd.DataFrame):
+            row_items = list(batch_df.iterrows())
+        elif POLARS_AVAILABLE and isinstance(batch_df, pl.DataFrame):
+             rows_as_dicts = batch_df.to_dicts()
+             row_items = list(enumerate(rows_as_dicts)) 
         else:
-            logger.error(f"Unsupported provider type: {provider_type}")
-            return None
+             logger.error("Unsupported DataFrame type in _process_batch")
+             return [], {'successful_calls': 0}, 0.0
 
-    # Simplified placeholder for provider retry mechanism
-    def _call_provider_with_retry(self, *args, **kwargs) -> Any:
-        """Simplified placeholder for provider retry mechanism."""
-        return None
+        for row_tuple in row_items:
+            tasks.append(
+                self._process_row_item(
+                    row_tuple=row_tuple,
+                    config=config,
+                    log_requests=log_requests,
+                )
+            )
+        
+        # Run tasks concurrently with the provided gather function
+        results_tuples = await gather_func(*tasks, desc="Processing Rows in Batch", leave=False)
+        
+        # Aggregate results, usage, and duration from the batch
+        batch_results_list = []
+        aggregated_batch_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'successful_calls': 0}
+        total_batch_api_duration = 0.0
+        
+        for result_data, usage_stats, api_duration in results_tuples:
+            if result_data:
+                result_data.pop('<row_index>', None)
+                batch_results_list.append(result_data)
+                
+            if usage_stats:
+                aggregated_batch_usage['prompt_tokens'] += usage_stats.get('prompt_tokens', 0)
+                aggregated_batch_usage['completion_tokens'] += usage_stats.get('completion_tokens', 0)
+                aggregated_batch_usage['total_tokens'] += usage_stats.get('total_tokens', 0)
+                aggregated_batch_usage['successful_calls'] += usage_stats.get('successful_calls', 0)
+            total_batch_api_duration += api_duration
+            
+        return batch_results_list, aggregated_batch_usage, total_batch_api_duration
